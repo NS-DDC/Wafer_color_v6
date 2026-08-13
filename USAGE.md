@@ -200,6 +200,11 @@ python test_natural_color_series.py
 # 자연스러운 pearl-white + 갈색 잔류물 street 이미지
 python test_white_brown_natural_streets.py
 
+# 모든 원본 fixture의 grid + wafer center + 최근접 기준 코너 결과 생성
+python make_all_diagnostics.py
+# 위 19개 결과의 한 장짜리 미리보기 생성
+python make_all_diagnostics_contact_sheet.py
+
 # 실제/자연스러운 색상 wafer를 +/-0.5, 1, 2, 3도로 회전한 angle 보정 시험
 python test_angle_alignment.py
 
