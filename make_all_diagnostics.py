@@ -1,7 +1,7 @@
 """Render grid, wafer centre and nearest reference corner for every fixture.
 
-The source images are never edited.  Every output is written to its own folder
-under ``TestAssets/AllDiagnostics/<group>/<source-stem>/diagnostic.png``.
+The source images are never edited. All result images are written directly to
+``TestAssets/AllDiagnostics`` so they can be checked in one place.
 """
 
 from __future__ import annotations
@@ -83,16 +83,13 @@ def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     manifest = ["# All diagnostic renders", "",
                 "Yellow: detected grid; red: wafer centre; blue: nearest grid reference corner.", "",
-                "| Source | Method | Pitch (px) | Centre | Nearest corner | Result folder |",
+                "| Source | Method | Pitch (px) | Centre | Nearest corner | Result |",
                 "| --- | --- | --- | --- | --- | --- |"]
     failures: list[str] = []
     for group, source, config in _sources():
-        result_dir = OUT_DIR / group / source.stem
-        result_name = "diagnostic.png"
-        output = result_dir / result_name
-        # Re-render real inputs when the script is run: their diagnostic
-        # settings are deliberately tied to the maintained real-image bounds.
-        if output.exists() and group != "img":
+        result_name = f"{group}__{source.stem}__diagnostic.png"
+        output = OUT_DIR / result_name
+        if output.exists():
             # Regenerate the small metadata record, but preserve the existing
             # full-resolution render on resumptions.
             try:
@@ -101,7 +98,7 @@ def main() -> None:
                     f"| `{group}/{source.name}` | {info['grid']['selected_method']} | "
                     f"{die_map.pitch_x:.1f} x {die_map.pitch_y:.1f} | "
                     f"({die_map.wafer_cx}, {die_map.wafer_cy}) | "
-                    f"({die_map.x0}, {die_map.y0}) | [{group}/{source.stem}]({group}/{source.stem}) |"
+                    f"({die_map.x0}, {die_map.y0}) | [{result_name}]({result_name}) |"
                 )
                 print(f"INDEX {group}/{source.name}: existing result")
                 continue
@@ -111,13 +108,12 @@ def main() -> None:
                 continue
         try:
             rendered, die_map, info = _render(source, config)
-            result_dir.mkdir(parents=True, exist_ok=True)
             assert cv2.imwrite(str(output), rendered), output
             manifest.append(
                 f"| `{group}/{source.name}` | {info['grid']['selected_method']} | "
                 f"{die_map.pitch_x:.1f} x {die_map.pitch_y:.1f} | "
                 f"({die_map.wafer_cx}, {die_map.wafer_cy}) | "
-                f"({die_map.x0}, {die_map.y0}) | [{group}/{source.stem}]({group}/{source.stem}) |"
+                f"({die_map.x0}, {die_map.y0}) | [{result_name}]({result_name}) |"
             )
             print(f"OK  {group}/{source.name}: {die_map.pitch_x:.1f} x {die_map.pitch_y:.1f}")
         except Exception as exc:

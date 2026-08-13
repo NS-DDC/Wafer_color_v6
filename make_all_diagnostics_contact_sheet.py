@@ -12,7 +12,7 @@ OUTPUT = SOURCE / "all_diagnostics_contact_sheet.jpg"
 
 
 def main() -> None:
-    files = sorted(SOURCE.glob("*/*/diagnostic.png"))
+    files = sorted(SOURCE.glob("*__diagnostic.png"))
     assert len(files) == 19, f"Expected 19 diagnostic files, got {len(files)}"
     tile_w, tile_h, label_h, cols = 300, 300, 34, 5
     rows = int(np.ceil(len(files) / cols))
@@ -24,7 +24,7 @@ def main() -> None:
         row, col = divmod(index, cols)
         y, x = row * (tile_h + label_h), col * tile_w
         sheet[y:y + tile_h, x:x + tile_w] = thumb
-        label = f"{path.parent.parent.name}/{path.parent.name}"
+        label = path.name.replace("__diagnostic.png", "").replace("__", "/")
         cv2.putText(sheet, label[:44], (x + 5, y + tile_h + 22),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.34, (255, 255, 255), 1, cv2.LINE_AA)
     assert cv2.imwrite(str(OUTPUT), sheet, [cv2.IMWRITE_JPEG_QUALITY, 92]), OUTPUT
