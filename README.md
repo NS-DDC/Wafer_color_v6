@@ -16,6 +16,24 @@ For the recommended colour-robust V5-compatible workflow, see
 [HOW_IT_WORKS_VISUAL.md](HOW_IT_WORKS_VISUAL.md). For the independently contributed standalone V6 path,
 see [README_claude.md](README_claude.md).
 
+## One-file copy/paste version
+
+Use [wafer_die_map_v6_single.py](wafer_die_map_v6_single.py) when the target
+application needs one file only. It includes the complete original V5 body and
+the colour-robust extension, with no `import wafer_die_map_v5` dependency.
+
+```python
+from wafer_die_map_v6_single import ColorRobustConfig, build_die_map_robust
+
+dm = build_die_map_robust(
+    r"E:\data\wafer.png",
+    config=ColorRobustConfig(min_pitch=75, max_pitch=95),
+)
+```
+
+The original `build_die_map`, `locate_die`, and `crop_die` APIs remain in the
+same file. Run `python test_single_file.py` to verify the standalone file.
+
 ## Quick start
 
 ```powershell

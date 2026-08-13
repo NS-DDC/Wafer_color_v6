@@ -4,6 +4,11 @@
 `wafer_die_map_v5.py`는 수정하지 않으며, 새 함수가 반환하는 `dm`은 기존 V5의
 `WaferDieMap` 형식과 호환됩니다.
 
+다른 코드에 통째로 복사/붙여넣기할 때는 `wafer_die_map_v6_single.py` 하나만
+사용하십시오. V5 본문과 이 문서의 colour-robust 확장이 이미 합쳐져 있으므로
+`wafer_die_map_v5.py`나 `wafer_die_map_color_robust.py`를 함께 복사할 필요가
+없습니다.
+
 ## 1. 설치
 
 Python 3.9 이상과 아래 패키지가 필요합니다.
@@ -189,6 +194,9 @@ python test_natural_color_series.py
 
 # 실제/자연스러운 색상 wafer를 +/-0.5, 1, 2, 3도로 회전한 angle 보정 시험
 python test_angle_alignment.py
+
+# V5 + colour-robust이 합쳐진 단일 파일 검증
+python test_single_file.py
 ```
 
 테스트 원본 위치:
