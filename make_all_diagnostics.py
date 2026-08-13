@@ -1,7 +1,7 @@
 """Render grid, wafer centre and nearest reference corner for every fixture.
 
-The source images are never edited.  Outputs are written under
-``TestAssets/AllDiagnostics`` with their source group in the filename.
+The source images are never edited.  Every output is written to its own folder
+under ``TestAssets/AllDiagnostics/<group>/<source-stem>/diagnostic.png``.
 """
 
 from __future__ import annotations
@@ -25,7 +25,9 @@ def _sources() -> Iterable[tuple[str, Path, ColorRobustConfig]]:
     # in each source image's native pixel system.
     base = ColorRobustConfig(min_pitch=25, max_pitch=160, angle_align="none")
     for path in sorted((ROOT / "Img").glob("*.png")):
-        yield "img", path, base
+        # Match the real-image regression bounds: a wide unconstrained search
+        # can choose a repeated feature inside a die as a false half-pitch.
+        yield "img", path, ColorRobustConfig(min_pitch=60, max_pitch=110)
     for path in sorted((ROOT / "TestAssets" / "ColorVariants").glob("*")):
         if path.suffix.lower() in {".jpg", ".jpeg", ".png"} and "_overlay" not in path.stem:
             align = "robust" if "rotated" in path.stem else "none"
@@ -81,13 +83,16 @@ def main() -> None:
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     manifest = ["# All diagnostic renders", "",
                 "Yellow: detected grid; red: wafer centre; blue: nearest grid reference corner.", "",
-                "| Source | Method | Pitch (px) | Centre | Nearest corner | Result |",
+                "| Source | Method | Pitch (px) | Centre | Nearest corner | Result folder |",
                 "| --- | --- | --- | --- | --- | --- |"]
     failures: list[str] = []
     for group, source, config in _sources():
-        result_name = f"{group}__{source.stem}__diagnostic.png"
-        output = OUT_DIR / result_name
-        if output.exists():
+        result_dir = OUT_DIR / group / source.stem
+        result_name = "diagnostic.png"
+        output = result_dir / result_name
+        # Re-render real inputs when the script is run: their diagnostic
+        # settings are deliberately tied to the maintained real-image bounds.
+        if output.exists() and group != "img":
             # Regenerate the small metadata record, but preserve the existing
             # full-resolution render on resumptions.
             try:
@@ -96,7 +101,7 @@ def main() -> None:
                     f"| `{group}/{source.name}` | {info['grid']['selected_method']} | "
                     f"{die_map.pitch_x:.1f} x {die_map.pitch_y:.1f} | "
                     f"({die_map.wafer_cx}, {die_map.wafer_cy}) | "
-                    f"({die_map.x0}, {die_map.y0}) | [{result_name}]({result_name}) |"
+                    f"({die_map.x0}, {die_map.y0}) | [{group}/{source.stem}]({group}/{source.stem}) |"
                 )
                 print(f"INDEX {group}/{source.name}: existing result")
                 continue
@@ -106,12 +111,13 @@ def main() -> None:
                 continue
         try:
             rendered, die_map, info = _render(source, config)
+            result_dir.mkdir(parents=True, exist_ok=True)
             assert cv2.imwrite(str(output), rendered), output
             manifest.append(
                 f"| `{group}/{source.name}` | {info['grid']['selected_method']} | "
                 f"{die_map.pitch_x:.1f} x {die_map.pitch_y:.1f} | "
                 f"({die_map.wafer_cx}, {die_map.wafer_cy}) | "
-                f"({die_map.x0}, {die_map.y0}) | [{result_name}]({result_name}) |"
+                f"({die_map.x0}, {die_map.y0}) | [{group}/{source.stem}]({group}/{source.stem}) |"
             )
             print(f"OK  {group}/{source.name}: {die_map.pitch_x:.1f} x {die_map.pitch_y:.1f}")
         except Exception as exc:
