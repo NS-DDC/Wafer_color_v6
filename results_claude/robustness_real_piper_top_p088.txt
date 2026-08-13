@@ -1,0 +1,26 @@
+
+### Img/real_piper_top_p088.png
+================================================================================================
+ COLOR ROBUSTNESS HARNESS   source=real_piper_top_p088   pitch_tol=2.0%  dies_tol=3.0%
+================================================================================================
+ variant             |                 v6                  |                 v5                  
+                     |  pitch_x  pitch_y   dies           |  pitch_x  pitch_y   dies           
+------------------------------------------------------------------------------------------------
+ original            |   87.977   88.000    800 OK  0.00%| ERR RuntimeError: No wafer street/   
+ invert              |   87.972   87.999    801 OK  0.12%|   88.000   88.000   1863 BAD 0.00%
+ gray                |   87.939   88.000    802 OK  0.25%| ERR RuntimeError: No wafer street/   
+ hue+60              |   87.965   88.001    799 OK  0.12%| ERR RuntimeError: No wafer street/   
+ hue+150             |   87.987   88.000    797 OK  0.38%| ERR RuntimeError: No wafer street/   
+ desat0.25           |   87.978   88.000    797 OK  0.38%| ERR RuntimeError: No wafer street/   
+ gamma0.5            |   87.946   88.001    797 OK  0.38%| ERR RuntimeError: No wafer street/   
+ gamma2.0            |   87.997   87.999    788 OK  1.50%| ERR RuntimeError: No wafer street/   
+ lowcontrast         |   87.964   88.000    796 OK  0.50%| ERR RuntimeError: No wafer street/   
+ brightbg            |   87.967   88.001    800 OK  0.01%| ERR RuntimeError: No wafer street/   
+ sepia               |   87.990   87.994    803 OK  0.38%|   88.415   88.000    788 BAD 0.00%
+ cool_tint           |   87.993   88.001    800 OK  0.02%|   88.035   72.017    969 BAD 0.00%
+ noise12             |   87.950   87.994    798 OK  0.25%| ERR RuntimeError: No wafer street/   
+ illum_grad          |   87.969   87.999    800 OK  0.01%| ERR RuntimeError: No wafer street/   
+ white_street_brown  |   87.996   88.001    800 OK  0.02%| ERR RuntimeError: No wafer street/   
+------------------------------------------------------------------------------------------------
+ TOTAL               | 15/15 pass  (100%)                | 0/15 pass  (0%)                
+================================================================================================

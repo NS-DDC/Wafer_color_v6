@@ -1,0 +1,240 @@
+
+
+### Img/portable_bw_overlay.png
+========================================================================
+ WAFER COLOR-AGNOSTIC DIE MAP  (V6 / claude)  SELF-DIAGNOSIS
+========================================================================
+ background BGR      : (  3,  3,  3)   [corners]
+ wafer circle        : center=(1492,1524)  r=1394   coverage=0.652
+------------------------------------------------------------------------
+ pitch_x =    90.019 px   agreement=1.00   phase_conf=1.00   street=bright
+ pitch_y =    90.020 px   agreement=1.00   phase_conf=1.00   street=bright
+------------------------------------------------------------------------
+ [X] channel        pitch     score  pol  width%  used
+      chroma        90.000   1.0000   +    2.2   USE
+      sat           90.000   1.0000   +    2.2   USE
+      maxmin        90.000   1.0000   +    2.2   USE
+      a             90.000   1.0000   -    2.2   USE
+      b             90.000   1.0000   +    2.2   USE
+      L             89.794   0.9897   +    1.1   USE
+      stdL          90.368   0.9076   +    5.6   USE   x2 (r=+0.14->+0.99)
+------------------------------------------------------------------------
+ [Y] channel        pitch     score  pol  width%  used
+      stdL          90.059   0.9934   +    6.7   USE
+      a             90.000   0.5000   -    2.2   USE   suspicious width 0.01
+      chroma        90.000   0.5000   +    2.2   USE   suspicious width 0.01
+      sat           90.000   0.5000   +    2.2   USE   suspicious width 0.01
+      maxmin        90.000   0.5000   +    2.2   USE   suspicious width 0.01
+      b             90.000   0.5000   +    2.2   USE   suspicious width 0.01
+      L             90.046   0.4968   +    1.1   USE   suspicious width 0.01
+------------------------------------------------------------------------
+ angle projection    : +0.001 deg
+ angle 2D-FFT        : +1.049 deg   agree=False
+ angle applied       : +0.000 deg   confidence=0.61
+ notch found         : True
+ dies                : 755
+ elapsed             : 3.48 s
+------------------------------------------------------------------------
+ OVERALL             : OK
+   ! angle cross-check disagreed (projection=+0.001, fft=+1.049)
+========================================================================
+
+
+### Img/portable_bw_sample.png
+========================================================================
+ WAFER COLOR-AGNOSTIC DIE MAP  (V6 / claude)  SELF-DIAGNOSIS
+========================================================================
+ background BGR      : (  3,  3,  3)   [corners]
+ wafer circle        : center=(1493,1524)  r=1393   coverage=0.653
+------------------------------------------------------------------------
+ pitch_x =    89.805 px   agreement=1.00   phase_conf=0.99   street=dark
+ pitch_y =    90.081 px   agreement=1.00   phase_conf=0.47   street=dark
+------------------------------------------------------------------------
+ [X] channel        pitch     score  pol  width%  used
+      L             89.767   0.9971   -   14.4   USE   x2 (r=-0.11->+1.00)
+      stdL          89.844   0.9885   +   12.2   USE   x2 (r=+0.55->+0.99)
+      a              0.000   0.0000   ?    0.0    -    no periodic peak
+      b              0.000   0.0000   ?    0.0    -    no periodic peak
+      chroma         0.000   0.0000   ?    0.0    -    no periodic peak
+      sat            0.000   0.0000   ?    0.0    -    no periodic peak
+      maxmin         0.000   0.0000   ?    0.0    -    no periodic peak
+------------------------------------------------------------------------
+ [Y] channel        pitch     score  pol  width%  used
+      L             90.014   0.9964   -    4.4   USE
+      stdL          90.150   0.9904   +   13.3   USE
+      a              0.000   0.0000   ?    0.0    -    no periodic peak
+      b              0.000   0.0000   ?    0.0    -    no periodic peak
+      chroma         0.000   0.0000   ?    0.0    -    no periodic peak
+      sat            0.000   0.0000   ?    0.0    -    no periodic peak
+      maxmin         0.000   0.0000   ?    0.0    -    no periodic peak
+------------------------------------------------------------------------
+ angle projection    : +0.000 deg
+ angle 2D-FFT        : +1.057 deg   agree=False
+ angle applied       : +1.099 deg   confidence=0.60
+ notch found         : True
+ dies                : 751
+ elapsed             : 4.36 s
+------------------------------------------------------------------------
+ OVERALL             : CHECK WARNINGS
+   ! angle cross-check disagreed (projection=+0.000, fft=+1.057)
+   ! [y] weak phase consensus 0.47 — street position uncertain
+========================================================================
+
+
+### Img/real_casio_top_p092.png
+========================================================================
+ WAFER COLOR-AGNOSTIC DIE MAP  (V6 / claude)  SELF-DIAGNOSIS
+========================================================================
+ background BGR      : (  0,  0,  0)   [corners]
+ wafer circle        : center=(1536,1536)  r=1401   coverage=0.582
+------------------------------------------------------------------------
+ pitch_x =    92.005 px   agreement=1.00   phase_conf=0.99   street=dark
+ pitch_y =    92.003 px   agreement=1.00   phase_conf=0.91   street=dark
+------------------------------------------------------------------------
+ [X] channel        pitch     score  pol  width%  used
+      sat           92.008   0.9995   -    4.3   USE
+      a             92.001   0.9994   -    2.2   USE
+      L             92.007   0.9993   -   13.0   USE
+      b             92.005   0.9989   -   17.4   USE
+      chroma        92.005   0.9988   -   17.4   USE
+      maxmin        92.004   0.9987   -   21.7   USE
+      stdL          92.000   0.9976   +   10.9   USE
+------------------------------------------------------------------------
+ [Y] channel        pitch     score  pol  width%  used
+      sat           91.999   0.9998   -   13.0   USE
+      L             92.004   0.9997   -   20.7   USE   x2 (r=+0.02->+1.00)
+      a             92.000   0.9997   -   10.9   USE
+      b             92.001   0.9996   -   17.4   USE
+      chroma        92.002   0.9996   -   15.2   USE
+      maxmin        92.001   0.9995   -   25.0   USE
+      stdL          92.012   0.9975   -    8.7   USE   x2 (r=+0.20->+1.00)
+------------------------------------------------------------------------
+ angle projection    : -0.000 deg
+ angle 2D-FFT        : +0.416 deg   agree=True
+ angle applied       : +0.950 deg   confidence=1.00
+ notch found         : False
+ dies                : 732
+ elapsed             : 3.10 s
+------------------------------------------------------------------------
+ OVERALL             : OK
+========================================================================
+
+
+### Img/real_exposed_top_p078.png
+========================================================================
+ WAFER COLOR-AGNOSTIC DIE MAP  (V6 / claude)  SELF-DIAGNOSIS
+========================================================================
+ background BGR      : (  0,  0,  0)   [corners]
+ wafer circle        : center=(1536,1536)  r=1401   coverage=0.602
+------------------------------------------------------------------------
+ pitch_x =    78.002 px   agreement=1.00   phase_conf=0.67   street=bright
+ pitch_y =    78.002 px   agreement=1.00   phase_conf=0.21   street=bright
+------------------------------------------------------------------------
+ [X] channel        pitch     score  pol  width%  used
+      L             78.000   0.9968   +   14.1   USE
+      stdL          77.994   0.9938   +   37.2   USE
+      a             78.000   0.4999   -    1.3   USE   suspicious width 0.01
+      sat           78.010   0.4998   +    1.3   USE   suspicious width 0.01
+      maxmin        78.012   0.4998   +    1.3   USE   suspicious width 0.01
+      chroma        78.008   0.4998   +    1.3   USE   suspicious width 0.01
+      b             11.143   0.0552   +    9.1    - 
+------------------------------------------------------------------------
+ [Y] channel        pitch     score  pol  width%  used
+      stdL          77.995   0.9982   +   11.5   USE
+      L             78.008   0.9962   +   11.5   USE
+      chroma        78.003   0.4999   +    1.3   USE   x2 (r=+0.12->+1.00) suspicious width 0.01
+      maxmin        77.999   0.4998   +    1.3   USE   suspicious width 0.01
+      sat           78.003   0.4998   +    1.3   USE   suspicious width 0.01
+      a             78.000   0.4998   -    1.3   USE   suspicious width 0.01
+      b             78.006   0.4997   +    1.3   USE   suspicious width 0.01
+------------------------------------------------------------------------
+ angle projection    : -0.000 deg
+ angle 2D-FFT        : +32.383 deg   agree=False
+ angle applied       : -0.847 deg   confidence=0.25
+ notch found         : False
+ dies                : 1019
+ elapsed             : 4.82 s
+------------------------------------------------------------------------
+ OVERALL             : CHECK WARNINGS
+   ! angle cross-check disagreed (projection=-0.000, fft=+32.383)
+   ! [y] weak phase consensus 0.21 — street position uncertain
+========================================================================
+
+
+### Img/real_mips_top_p084.png
+========================================================================
+ WAFER COLOR-AGNOSTIC DIE MAP  (V6 / claude)  SELF-DIAGNOSIS
+========================================================================
+ background BGR      : (  0,  0,  0)   [corners]
+ wafer circle        : center=(1535,1536)  r=1400   coverage=0.601
+------------------------------------------------------------------------
+ pitch_x =    83.999 px   agreement=0.95   phase_conf=0.90   street=bright
+ pitch_y =    84.002 px   agreement=0.88   phase_conf=1.00   street=dark
+------------------------------------------------------------------------
+ [X] channel        pitch     score  pol  width%  used
+      chroma        84.000   0.9995   +    3.6   USE   x2 (r=-0.14->+1.00)
+      sat           83.998   0.9987   +   11.9   USE
+      L             83.999   0.9958   -    7.1   USE
+      stdL          83.997   0.9950   +    7.1   USE
+      a             84.001   0.4998   -    1.2   USE   suspicious width 0.01
+      b              9.333   0.1321   +   44.4    - 
+      maxmin        10.500   0.0861   -   30.0    - 
+------------------------------------------------------------------------
+ [Y] channel        pitch     score  pol  width%  used
+      b             84.000   0.9996   -    6.0   USE
+      stdL          84.004   0.9993   +   10.7   USE
+      L             84.002   0.9990   -    6.0   USE
+      sat           84.001   0.9979   -    3.6   USE
+      chroma        42.001   0.5087   +    4.8    -    x3 (r=+0.11->+0.18)
+      a             84.004   0.5000   -    1.2   USE   x3 (r=+0.16->+1.00) suspicious width 0.01
+      maxmin        14.000   0.0983   -   42.9    - 
+------------------------------------------------------------------------
+ angle projection    : -0.000 deg
+ angle 2D-FFT        : +0.265 deg   agree=True
+ angle applied       : +1.252 deg   confidence=1.00
+ notch found         : False
+ dies                : 874
+ elapsed             : 3.14 s
+------------------------------------------------------------------------
+ OVERALL             : OK
+========================================================================
+
+
+### Img/real_piper_top_p088.png
+========================================================================
+ WAFER COLOR-AGNOSTIC DIE MAP  (V6 / claude)  SELF-DIAGNOSIS
+========================================================================
+ background BGR      : (  0,  0,  0)   [corners]
+ wafer circle        : center=(1536,1536)  r=1401   coverage=0.600
+------------------------------------------------------------------------
+ pitch_x =    87.977 px   agreement=1.00   phase_conf=0.41   street=bright
+ pitch_y =    88.000 px   agreement=1.00   phase_conf=0.81   street=bright
+------------------------------------------------------------------------
+ [X] channel        pitch     score  pol  width%  used
+      sat           87.998   0.9999   +    3.4   USE   x3 (r=-0.01->+1.00)
+      chroma        88.005   0.9998   +    2.3   USE   x3 (r=-0.05->+1.00)
+      maxmin        87.997   0.9997   +    4.5   USE
+      b             88.001   0.9996   -    3.4   USE
+      L             87.886   0.9988   +    2.3   USE   x2 (r=-0.23->+1.00)
+      stdL          87.964   0.9975   +   20.5   USE   x2 (r=+0.54->+1.00)
+      a             88.002   0.4998   -    1.1   USE   suspicious width 0.01
+------------------------------------------------------------------------
+ [Y] channel        pitch     score  pol  width%  used
+      b             87.999   0.9997   -    4.5   USE
+      maxmin        88.001   0.9997   +    4.5   USE
+      sat           88.001   0.9996   +    4.5   USE
+      chroma        88.000   0.9992   +    6.8   USE
+      a             88.000   0.9987   -    5.7   USE
+      L             88.009   0.9984   -    1.1   USE
+      stdL          87.991   0.9983   +    8.0   USE
+------------------------------------------------------------------------
+ angle projection    : -0.000 deg
+ angle 2D-FFT        : +0.215 deg   agree=True
+ angle applied       : -1.548 deg   confidence=1.00
+ notch found         : False
+ dies                : 800
+ elapsed             : 3.74 s
+------------------------------------------------------------------------
+ OVERALL             : CHECK WARNINGS
+   ! [x] weak phase consensus 0.41 — street position uncertain
+========================================================================
