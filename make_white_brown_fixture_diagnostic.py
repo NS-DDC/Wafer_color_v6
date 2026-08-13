@@ -57,10 +57,22 @@ def main() -> None:
     cv2.line(result, (cx, cy - 25), (cx, cy + 25), (0, 0, 255), 2, cv2.LINE_AA)
     cv2.putText(result, "Detected wafer center", (cx + 20, cy - 20),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.55, (0, 0, 255), 2, cv2.LINE_AA)
+
+    # The blue diamond is the coordinate reference corner, not the wafer
+    # centre.  It is the (x0, y0) street intersection used by locate_die():
+    # the die immediately to its upper-right is index (0, 0).
+    x0, y0 = int(round(die_map.x0)), int(round(die_map.y0))
+    diamond = np.array([[x0, y0 - 13], [x0 + 13, y0],
+                        [x0, y0 + 13], [x0 - 13, y0]], np.int32)
+    cv2.fillConvexPoly(result, diamond, (255, 90, 0), cv2.LINE_AA)
+    cv2.polylines(result, [diamond], True, (255, 255, 255), 1, cv2.LINE_AA)
+    cv2.putText(result, f"Grid reference corner (x0, y0) = ({x0}, {y0})",
+                (x0 + 20, y0 + 30), cv2.FONT_HERSHEY_SIMPLEX, 0.50,
+                (255, 90, 0), 2, cv2.LINE_AA)
     cv2.putText(result, f"grid {die_map.pitch_x:.0f} x {die_map.pitch_y:.0f} px | {info['grid']['selected_method']}",
                 (30, 40), cv2.FONT_HERSHEY_SIMPLEX, 0.72, (0, 235, 255), 2, cv2.LINE_AA)
     assert cv2.imwrite(str(OUTPUT), result), f"Could not write {OUTPUT}"
-    print(f"Wrote {OUTPUT.name}: center=({cx}, {cy}), "
+    print(f"Wrote {OUTPUT.name}: center=({cx}, {cy}), origin=({x0}, {y0}), "
           f"pitch=({die_map.pitch_x:.1f}, {die_map.pitch_y:.1f})")
 
 

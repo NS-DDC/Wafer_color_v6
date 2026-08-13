@@ -21,6 +21,7 @@ outside the wafer and no square-tile intersections. Its regression test is
 `test_white_brown_natural_streets.py`.
 
 `white_brown_natural_streets_ai_grid_center.png` is the visual acceptance
-result: yellow lines are the detected grid and the red crosshair is the
-detected wafer centre. Regenerate it with
+result: yellow lines are the detected grid, the red crosshair is the detected
+wafer centre, and the blue diamond is the coordinate reference corner
+`(x0, y0)` (its upper-right die is index `(0, 0)`). Regenerate it with
 `python make_white_brown_fixture_diagnostic.py`.
