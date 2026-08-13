@@ -59,6 +59,7 @@ python test_color_robust.py
 python test_adversarial_color_robust.py
 python generate_color_variants.py
 python test_color_variants.py
+python test_natural_color_series.py
 ```
 
 실행하면 `_color_robust_diagnostics`에 초록색 grid overlay가 생성됩니다.
