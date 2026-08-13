@@ -1604,12 +1604,22 @@ def detect_grid_adaptive(img_bgr: np.ndarray,
         base = float(rx1 if axis == "x" else ry1)
         street_ph, phase_conf = _consensus_phase(cluster, pitch, base, scale)
 
-        if axis == "x":
-            k = round((wafer_cx - street_ph) / pitch)
-            origin = street_ph + k * pitch
-        else:
-            k = math.floor((wafer_cy - street_ph) / pitch)
-            origin = street_ph + k * pitch
+        # grid 원점(x0,y0) = 웨이퍼 중심에 **가장 가까운** street 교차점.
+        # x/y 모두 round 를 쓴다 (중심에서 최대 ±0.5 pitch).
+        #
+        # v5 도 동일하다 (wafer_die_map_v5.py:588-589):
+        #     kx = int(math.floor((wafer_cx - x1 - phase_x - bias_x) / pitch_x + 0.5))
+        #     ky = int(math.floor((wafer_cy - y1 - phase_y - bias_y) / pitch_y + 0.5))
+        # `floor(z + 0.5)` 는 round-half-up 이므로 v5 는 두 축 모두 반올림이다.
+        #
+        # 예전에는 y 축만 math.floor 를 썼는데, 그러면 원점이 항상 중심보다
+        # 위쪽(y 가 작은 쪽) 격자선으로 잡혀서 (실측 9장 전부 -0.90~-0.99 pitch)
+        # 1) 오버레이의 자홍 원점 마커가 중심 십자에서 한 칸 떨어져 보이고
+        # 2) dies_by_index 의 iy 가 v5 대비 1 만큼 밀렸다.
+        # 격자선 집합 자체는 같아서 pitch/die 크기/개수에는 영향이 없다.
+        anchor = wafer_cx if axis == "x" else wafer_cy
+        k = round((anchor - street_ph) / pitch)
+        origin = street_ph + k * pitch
 
         pol_votes = sum(c.score * c.polarity for c in cluster)
         pol_str = "bright" if pol_votes > 0 else "dark"
@@ -2349,11 +2359,19 @@ def save_debug_overlay(die_map: WaferDieMapV6,
 
     색상 규약
     --------
-    노랑    웨이퍼 원 + 중심 십자
+    노랑    웨이퍼 원 + 중심 십자 (wafer_cx, wafer_cy)
     주황선  grid street 격자 (x0/y0 lattice)
     자홍    grid 원점(x0,y0) / notch 위치
     초록    내부(full) die
     청록    edge die
+
+    참고 — 주황 격자선은 die 사각형과 정확히 같은 자리에 놓이는데,
+    die 를 나중에 그리므로 ``draw_dies=True`` 면 대부분 초록/청록에
+    덮여 보이지 않는다. 격자선만 보려면 ``draw_dies=False`` 로 호출하라.
+
+    자홍 X 표시(grid 원점)는 웨이퍼 중심에 **가장 가까운** street 교차점이라
+    노랑 십자와 반 pitch 이내로 붙어 있어야 정상이다. 한 칸 이상 떨어져
+    보인다면 pitch 나 phase 추정이 틀린 것이므로 리포트를 확인하라.
     """
     canvas = die_map.aligned_image
     if canvas is None:

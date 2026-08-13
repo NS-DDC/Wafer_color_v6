@@ -275,6 +275,63 @@ failures**, and no new warnings on any previously-clean image.
 
 ---
 
+## Grid origin: `floor` vs `round` on the y axis
+
+Reviewing the debug overlays turned up a sixth issue. The magenta origin marker
+`(x0, y0)` should sit on the street intersection *nearest* the yellow wafer-centre
+cross, but it was consistently one row above it.
+
+Cause — the two axes disagreed:
+
+```python
+if axis == "x":
+    k = round((wafer_cx - street_ph) / pitch)     # nearest line, ±0.5 pitch
+else:
+    k = math.floor((wafer_cy - street_ph) / pitch)  # always toward smaller y
+```
+
+Measured origin-to-centre offset over all 9 real + NCS images:
+
+| | before | after |
+|---|---|---|
+| `dx / pitch_x` | −0.13 … +0.45 | −0.13 … +0.45 (unchanged) |
+| `dy / pitch_y` | **−0.90 … −0.99 on all 9** | −0.47 … +0.09 |
+| origins outside ±0.5 pitch | 9 / 9 | **0 / 9** |
+
+The `floor` was worth checking rather than assuming, since v5 counts `iy`
+*upward* from the origin (`cy_d = y0 - iy*pitch_y - pitch_y/2`) while `ix` counts
+rightward, so it could plausibly have been deliberate v5-index compatibility.
+It was not — v5 rounds on **both** axes (`wafer_die_map_v5.py:588`):
+
+```python
+kx = int(math.floor((wafer_cx - x1 - phase_x - bias_x) / pitch_x + 0.5))
+ky = int(math.floor((wafer_cy - y1 - phase_y - bias_y) / pitch_y + 0.5))
+```
+
+`floor(z + 0.5)` is round-half-up. Running both on `real_casio_top_p092.png`
+confirmed it directly — same centre `(1536, 1536)`, same 92 px pitch:
+
+| | v5 | v6 before | v6 after |
+|---|---|---|---|
+| origin | (1536, 1534) | (1533, **1447**) | (1533, **1539**) |
+| offset from centre | (0.000, −0.022) pitch | (−0.033, **−0.967**) pitch | (−0.033, **+0.033**) pitch |
+
+So the asymmetry was v6's own, and it put `dies_by_index` one row out of step
+with v5. Fixed by using `round` on both axes.
+
+Impact is limited to labelling and display: the lattice `y = y0 + m·pitch_y` is
+the same set of lines whichever `k` anchors it, so pitch, die size and die count
+are untouched — die counts are byte-identical before and after (casio 732,
+piper 800, exposed 1019, mips 874, NCS 1131 / 1131 / 1132 / 865), and the
+regression stays at **29/29 synthetic, 4/4 real, 4/4 NCS**.
+
+Also corrected in the same pass: the overlay docstring advertised orange grid
+lines, but die rectangles are drawn *after* the lattice and tile exactly on it,
+so the orange is always overpainted green. Use `draw_dies=False` to actually see
+the grid lines.
+
+---
+
 ## CLI
 
 ```bash
