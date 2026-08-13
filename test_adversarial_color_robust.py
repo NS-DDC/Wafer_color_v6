@@ -107,6 +107,14 @@ def main() -> None:
     print(f"ai_generated_multicolor: {info['grid']['selected_method']}, "
           f"pitch=({result.pitch_x:.1f}, {result.pitch_y:.1f}), dies={result.num_dies}")
 
+    natural = cv2.imread(str(ROOT / "TestAssets" / "generated_multicolor_natural_streets_v2.png"))
+    assert natural is not None
+    result, info = build_die_map_robust(
+        natural, config=ColorRobustConfig(min_pitch=25, max_pitch=90), return_info=True)
+    assert result.num_dies > 500 and result.pitch_x >= 25 and result.pitch_y >= 25
+    print(f"ai_generated_natural_streets_v2: {info['grid']['selected_method']}, "
+          f"pitch=({result.pitch_x:.1f}, {result.pitch_y:.1f}), dies={result.num_dies}")
+
 
 if __name__ == "__main__":
     main()
