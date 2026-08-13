@@ -1612,10 +1612,16 @@ def detect_grid_adaptive(img_bgr: np.ndarray,
         #     ky = int(math.floor((wafer_cy - y1 - phase_y - bias_y) / pitch_y + 0.5))
         # `floor(z + 0.5)` 는 round-half-up 이므로 v5 는 두 축 모두 반올림이다.
         #
-        # 예전에는 y 축만 math.floor 를 썼는데, 그러면 원점이 항상 중심보다
-        # 위쪽(y 가 작은 쪽) 격자선으로 잡혀서 (실측 9장 전부 -0.90~-0.99 pitch)
-        # 1) 오버레이의 자홍 원점 마커가 중심 십자에서 한 칸 떨어져 보이고
-        # 2) dies_by_index 의 iy 가 v5 대비 1 만큼 밀렸다.
+        # 예전에는 y 축만 math.floor 를 썼다. floor 는 -inf 쪽으로 버리는데
+        # 이미지 y 는 아래로 증가하므로, 원점이 항상 중심과 같거나 그 "위"
+        # 격자선으로만 잡혔다. 게다가 웨이퍼는 die 격자를 중심에 맞춰 찍기
+        # 때문에 중심 바로 아래(1~3px)에 street 선이 있는데, floor 는 아래쪽을
+        # 못 잡으니 그 선을 건너뛰고 한 pitch 를 통째로 올라갔다.
+        # 즉 격자가 잘 맞을수록 오차가 1 pitch 에 가까워지는 구조였다
+        # (실측 9장 중 7장이 -0.89 pitch 이상 어긋남. 나머지 2장은 가장 가까운
+        #  선이 마침 중심 위쪽이라 floor 와 round 가 같은 답을 냈다).
+        # 결과: 1) 오버레이의 자홍 원점 마커가 중심 십자에서 한 칸 떨어져 보이고
+        #       2) dies_by_index 의 iy 가 v5 대비 1 만큼 밀렸다.
         # 격자선 집합 자체는 같아서 pitch/die 크기/개수에는 영향이 없다.
         anchor = wafer_cx if axis == "x" else wafer_cy
         k = round((anchor - street_ph) / pitch)

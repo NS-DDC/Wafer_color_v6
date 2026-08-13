@@ -279,7 +279,7 @@ failures**, and no new warnings on any previously-clean image.
 
 Reviewing the debug overlays turned up a sixth issue. The magenta origin marker
 `(x0, y0)` should sit on the street intersection *nearest* the yellow wafer-centre
-cross, but it was consistently one row above it.
+cross, but on 7 of 9 images it sat one row above it.
 
 Cause — the two axes disagreed:
 
@@ -295,8 +295,40 @@ Measured origin-to-centre offset over all 9 real + NCS images:
 | | before | after |
 |---|---|---|
 | `dx / pitch_x` | −0.13 … +0.45 | −0.13 … +0.45 (unchanged) |
-| `dy / pitch_y` | **−0.90 … −0.99 on all 9** | −0.47 … +0.09 |
-| origins outside ±0.5 pitch | 9 / 9 | **0 / 9** |
+| `dy / pitch_y` | −0.05 … −0.99, **7 of 9 beyond −0.89** | −0.47 … +0.09 |
+| origins outside ±0.5 pitch | 7 / 9 | **0 / 9** |
+
+Two things combine here, and the second is the interesting one.
+
+**Direction** is forced by `math.floor`, which truncates toward −∞. Image `y`
+grows downward, so smaller `y` is *higher* on screen, and picking the largest
+lattice line `≤ wafer_cy` can only ever land on or above the centre.
+
+**Magnitude** should then be anything in 0…1 pitch, but it clustered just under a
+full pitch. That is because a wafer's die grid is laid out centred on the wafer,
+so there is a street line very close to `wafer_cy` — the post-fix `round` offsets
+show exactly how close (mips +0.012, casio +0.033, teal +0.036, amber +0.072).
+They are all *positive*, i.e. the nearest line sits marginally **below** centre,
+which is the one place `floor` may not go. So it stepped over a line 1–3 px away
+and took the next one a whole pitch up:
+
+```
+    ─────────────   <- floor picked this (0.967 pitch up)
+          ^
+       92 px skipped
+          v
+    ──────+──────   <- wafer centre; correct line is 3 px below
+    ─────────────   <- round picks this
+```
+
+The perverse consequence is that **the better the grid is centred, the closer the
+`floor` error gets to a full die.**
+
+The two images that did not move — `portable_bw_sample` (−0.466) and
+`real_piper_top_p088` (−0.045) — happened to have their nearest line already
+above centre, so `floor` and `round` agreed. `piper` has the weakest phase
+estimate of the set (`phase_conf=0.41`), and that misalignment is precisely why
+it escaped.
 
 The `floor` was worth checking rather than assuming, since v5 counts `iy`
 *upward* from the origin (`cy_d = y0 - iy*pitch_y - pitch_y/2`) while `ix` counts
