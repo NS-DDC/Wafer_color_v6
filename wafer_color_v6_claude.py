@@ -501,7 +501,17 @@ class ColorProfile:
     """이보다 작은 pitch 는 후보에서 제외 (노이즈 주기 방지)."""
 
     max_pitch_ratio: float = 0.34
-    """pitch 상한 = 프로파일 길이 * 이 값 (최소 ~3주기는 보여야 신뢰)."""
+    """pitch 상한 = 프로파일 길이 * 이 값 (최소 ~3주기는 보여야 신뢰).
+
+    **알려진 한계** — 참 pitch 가 이 상한을 넘으면 FFT 는 그 값을 후보로
+    보지 못하고 배음(1/2, 1/3 ...)을 고른다. 시야에 die 가 5개 미만으로
+    보이는 매우 확대된 영상이 여기 해당한다.
+      * 1/2 배음 : 자동으로 경고가 뜬다 ("2배값을 검증하지 못했습니다").
+      * 1/3 이하 : street 가 pitch 의 10% 이상으로 매우 두꺼우면
+        경고 없이 잘못된 값이 나올 수 있다 (실측: 참 300px, street 30px
+        -> 30px 로 검출). 현실 웨이퍼 맵(20~40 die 이상)에서는 발생하지
+        않지만, 확대 영상을 다룬다면 ``pitch_x`` / ``pitch_y`` 를 직접
+        지정하거나 ``max_pitch_ratio`` 를 0.45 정도로 올려라."""
 
     roi_ratio: float = 0.62
     """격자 분석에 쓰는 중앙 정사각 ROI 반경 비율 (wafer_r 대비).
@@ -535,8 +545,121 @@ class ColorProfile:
     wafer_fill_bgr: Optional[Tuple[int, int, int]] = None
     """clean 시 웨이퍼 밖을 채울 색. None 이면 추정된 배경색으로 채움."""
 
+    # -----------------------------------------------------------------------
+    # 입력 검증 — "조용히 틀린 답" 을 막는다
+    # -----------------------------------------------------------------------
+    # 검증이 없으면 잘못된 파라미터가 예외 없이 통과해서, 겉보기엔 정상이지만
+    # 완전히 틀린 결과를 돌려준다. 실제로 관측된 사례:
+    #   max_pitch_ratio=0   -> pitch=(22.0,14.7) n=19111  (정답 88/88 n=800, 경고 0건)
+    #   roi_ratio=2.0       -> ROI 가 웨이퍼 밖 배경까지 먹어서 pitch 가 조용히 어긋남
+    #   pitch_x=3.0         -> min_pitch_px=8 보다 작은데도 통과, die 684,887 개 생성
+    #   background_bgr=(999,..) -> numpy 의 날것 OverflowError
+    #   feature_channels=() -> 사용자의 의도와 정반대로 "전체 채널" 로 조용히 대체
+    # 이런 값은 전부 사용자 실수이므로, 조용히 틀리기보다 즉시 명확하게 실패한다.
+    def __post_init__(self) -> None:
+        def _bad(field: str, got: Any, want: str) -> None:
+            raise ValueError(
+                f"ColorProfile.{field}={got!r} 은(는) 사용할 수 없습니다. {want}")
+
+        # --- 배경색: uint8 범위 --------------------------------------------
+        if self.background_bgr is not None:
+            bg = tuple(self.background_bgr)
+            if len(bg) != 3:
+                _bad("background_bgr", self.background_bgr, "(B, G, R) 3개여야 합니다.")
+            for v in bg:
+                if not isinstance(v, (int, float)) or not (0 <= float(v) <= 255):
+                    _bad("background_bgr", self.background_bgr,
+                         "각 채널은 0~255 여야 합니다.")
+            self.background_bgr = (int(bg[0]), int(bg[1]), int(bg[2]))
+
+        # --- street 극성: 문자열 계약 유지 ----------------------------------
+        if self.street_polarity is not None:
+            s = str(self.street_polarity).lower().strip()
+            if s in ("auto", "none", "0"):
+                self.street_polarity = None
+            elif s in ("bright", "light", "+1", "1"):
+                self.street_polarity = "bright"
+            elif s in ("dark", "-1"):
+                self.street_polarity = "dark"
+            else:
+                _bad("street_polarity", self.street_polarity,
+                     '"bright" | "dark" | None 중 하나여야 합니다.')
+
+        # --- feature 채널 ---------------------------------------------------
+        # 빈 시퀀스를 truthiness 로 판정하면 "전체 채널" 로 조용히 대체되므로
+        # 여기서 명시적으로 막는다.
+        if self.feature_channels is not None:
+            chans = tuple(self.feature_channels)
+            if not chans:
+                _bad("feature_channels", self.feature_channels,
+                     f"비어 있을 수 없습니다. 자동 선택을 원하면 None 을 주세요. "
+                     f"사용 가능: {list(FEATURE_NAMES)}")
+            bad = [c for c in chans if c not in FEATURE_NAMES]
+            if bad:
+                _bad("feature_channels", bad,
+                     f"사용 가능: {list(FEATURE_NAMES)}")
+            self.feature_channels = chans
+
+        # --- 고정 pitch -----------------------------------------------------
+        # 0 이나 음수는 die 열거 루프에서 0개 혹은 폭발적인 개수를 만든다.
+        for name in ("pitch_x", "pitch_y"):
+            v = getattr(self, name)
+            if v is None:
+                continue
+            v = float(v)
+            if not math.isfinite(v) or v <= 0:
+                _bad(name, v, "0 보다 큰 유한한 값이어야 합니다. "
+                              "자동 검출을 원하면 None 을 주세요.")
+            if v < self.min_pitch_px:
+                _bad(name, v,
+                     f"min_pitch_px({self.min_pitch_px}) 보다 작습니다. "
+                     f"의도한 값이면 min_pitch_px 도 함께 낮추세요.")
+            setattr(self, name, v)
+
+        # --- 탐색 범위 ------------------------------------------------------
+        if not math.isfinite(self.min_pitch_px) or self.min_pitch_px < 2.0:
+            _bad("min_pitch_px", self.min_pitch_px, "2.0 이상이어야 합니다.")
+        if not (0.0 < self.max_pitch_ratio <= 0.5):
+            _bad("max_pitch_ratio", self.max_pitch_ratio,
+                 "(0, 0.5] 범위여야 합니다. 기본값 0.34 는 최소 ~3주기를 보장합니다.")
+        if not (0.0 < self.roi_ratio <= 1.0):
+            _bad("roi_ratio", self.roi_ratio,
+                 "(0, 1.0] 범위여야 합니다. 1.0 을 넘으면 ROI 가 웨이퍼 밖 "
+                 "배경까지 포함해서 주기 분석이 망가집니다.")
+        if self.profile_max_dim < 64:
+            _bad("profile_max_dim", self.profile_max_dim, "64 이상이어야 합니다.")
+        if self.wafer_otsu_max_dim < 64:
+            _bad("wafer_otsu_max_dim", self.wafer_otsu_max_dim, "64 이상이어야 합니다.")
+
+        # --- 채널 채택 기준 --------------------------------------------------
+        if not (0.0 <= self.min_channel_score < 1.0):
+            _bad("min_channel_score", self.min_channel_score, "[0, 1) 범위여야 합니다.")
+        if not (0.0 < self.pitch_cluster_tol < 1.0):
+            _bad("pitch_cluster_tol", self.pitch_cluster_tol, "(0, 1) 범위여야 합니다.")
+
+        # --- 회전각 ----------------------------------------------------------
+        if self.angle_search_deg < 0 or self.angle_full_scan_deg < 0:
+            _bad("angle_search_deg/angle_full_scan_deg",
+                 (self.angle_search_deg, self.angle_full_scan_deg), "0 이상이어야 합니다.")
+        if self.angle_coarse_step <= 0 or self.angle_fine_step <= 0:
+            _bad("angle_coarse_step/angle_fine_step",
+                 (self.angle_coarse_step, self.angle_fine_step), "0 보다 커야 합니다.")
+        if self.angle_max_iter < 1:
+            _bad("angle_max_iter", self.angle_max_iter, "1 이상이어야 합니다.")
+
+        # --- wafer mask -------------------------------------------------------
+        if self.wafer_open_ksize < 1 or self.wafer_close_ksize < 1:
+            _bad("wafer_open_ksize/wafer_close_ksize",
+                 (self.wafer_open_ksize, self.wafer_close_ksize), "1 이상이어야 합니다.")
+        if self.wafer_fill_bgr is not None:
+            fb = tuple(self.wafer_fill_bgr)
+            if len(fb) != 3 or any(not (0 <= float(v) <= 255) for v in fb):
+                _bad("wafer_fill_bgr", self.wafer_fill_bgr,
+                     "(B, G, R) 각 0~255 여야 합니다.")
+            self.wafer_fill_bgr = (int(fb[0]), int(fb[1]), int(fb[2]))
+
     def merged(self, **kw: Any) -> "ColorProfile":
-        """일부 필드만 바꾼 사본."""
+        """일부 필드만 바꾼 사본. (사본도 동일하게 검증된다)"""
         from dataclasses import replace
         return replace(self, **kw)
 
@@ -726,15 +849,57 @@ class WaferDieMapV6:
 # 2) 공용 소도구
 # =============================================================================
 def _load_bgr(image: Union[str, Path, np.ndarray]) -> np.ndarray:
-    """경로(str/Path) 또는 BGR ndarray -> BGR 이미지."""
+    """경로(str/Path) 또는 ndarray -> **uint8 3채널 BGR** 이미지.
+
+    모든 공개 함수의 단일 입력 관문이다. 여기서 정규화를 끝내야
+    하위 함수들이 dtype/채널 수를 다시 걱정하지 않는다.
+
+    처리하는 것:
+      * 2채널(회색조)      -> BGR 로 확장
+      * 4채널(BGRA/RGBA)  -> 알파 버리고 BGR (PNG 에 흔하다)
+      * uint8 이 아닌 dtype -> uint8 로 정규화
+
+    dtype 정규화가 필요한 이유:
+      cv2.cvtColor(..., COLOR_BGR2LAB) 는 float32 입력을 **0~1 범위**로
+      해석한다. 0~255 범위의 float32 를 그냥 넘기면 Lab 값이 포화돼서
+      예외 없이 조용히 다른 pitch 가 나온다 (실측: 88.43 vs 정답 87.98).
+    """
     if isinstance(image, np.ndarray):
-        if image.ndim == 2:
-            return cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
-        return image
+        img = image
+        if img.ndim == 2:
+            img = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR)
+        elif img.ndim == 3 and img.shape[2] == 4:
+            img = img[:, :, :3]          # 알파 폐기
+        elif img.ndim == 3 and img.shape[2] == 1:
+            img = cv2.cvtColor(img[:, :, 0], cv2.COLOR_GRAY2BGR)
+        if img.ndim != 3 or img.shape[2] != 3:
+            raise ValueError(
+                f"지원하지 않는 이미지 형태 {image.shape}. "
+                "(H,W) 회색조 또는 (H,W,3) BGR 또는 (H,W,4) BGRA 여야 합니다.")
+        return _to_uint8(img)
     img = cv2.imread(str(image), cv2.IMREAD_COLOR)
     if img is None:
         raise FileNotFoundError(str(image))
     return img
+
+
+def _to_uint8(img: np.ndarray) -> np.ndarray:
+    """어떤 dtype 이든 0~255 uint8 BGR 로 맞춘다 (이미 uint8 이면 그대로)."""
+    if img.dtype == np.uint8:
+        return img
+    a = np.asarray(img)
+    if a.dtype == np.uint16:
+        return (a.astype(np.float32) / 257.0).clip(0, 255).astype(np.uint8)
+    if a.dtype == np.bool_:
+        return (a.astype(np.uint8) * 255)
+    a = a.astype(np.float32)
+    finite = a[np.isfinite(a)]
+    if finite.size == 0:
+        raise ValueError("이미지에 유효한(finite) 픽셀이 없습니다.")
+    hi = float(finite.max())
+    # 0~1 로 정규화된 float 인지, 0~255 스케일인지 판별한다.
+    scale = 255.0 if hi <= 1.0 + 1e-6 else 1.0
+    return np.nan_to_num(a * scale, nan=0.0).clip(0, 255).astype(np.uint8)
 
 
 def _odd(n: int) -> int:
@@ -856,6 +1021,9 @@ def detect_wafer_adaptive(img_bgr: np.ndarray,
     6) coverage 가 비정상(≈1 또는 ≈0)이면 내접원 fallback.
     """
     prof = profile or ColorProfile()
+    # 공개 함수는 단독 호출될 수 있으므로 여기서도 입력을 정규화한다.
+    # (BGRA/회색조/float 입력이 cvtColor 로 곧장 들어가 조용히 깨지는 것을 막는다)
+    img_bgr = _load_bgr(img_bgr)
     H, W = img_bgr.shape[:2]
 
     if prof.background_bgr is not None:
@@ -1372,9 +1540,13 @@ def detect_grid_adaptive(img_bgr: np.ndarray,
       die 중심 = (x0 + ix*px + px/2,  y0 - iy*py - py/2)
     """
     cfg = profile or ColorProfile()
+    img_bgr = _load_bgr(img_bgr)          # 단독 호출 대비 입력 정규화
     roi, rx1, ry1 = _grid_roi(img_bgr, wafer_cx, wafer_cy, wafer_r, cfg.roi_ratio)
     if roi.size == 0 or min(roi.shape[:2]) < 64:
-        raise RuntimeError("Grid ROI too small — wafer detection likely failed.")
+        raise RuntimeError(
+            f"Grid ROI too small ({roi.shape[:2] if roi.size else (0, 0)}) — "
+            f"wafer_r={wafer_r}, roi_ratio={cfg.roi_ratio}. "
+            "웨이퍼 검출이 실패했거나 이미지가 너무 작습니다.")
     small, scale = _downscale(roi, cfg.profile_max_dim)
 
     names = tuple(cfg.feature_channels) if cfg.feature_channels else FEATURE_NAMES
@@ -1386,6 +1558,8 @@ def detect_grid_adaptive(img_bgr: np.ndarray,
 
     out: List[float] = []
     for axis in ("x", "y"):
+        # 이 축의 1D 프로파일 길이 (축소본 기준). 주기 개수 / 탐색 상한 계산에 쓴다.
+        n_prof = float(small.shape[1] if axis == "x" else small.shape[0])
         chans: List[ChannelResult] = []
         for nm in names:
             f = feats[nm]
@@ -1459,6 +1633,41 @@ def detect_grid_adaptive(img_bgr: np.ndarray,
             if phase_conf < 0.5:
                 diag.warn(f"[{axis}] weak phase consensus {phase_conf:.2f} "
                           f"— street position uncertain")
+
+            # ---------------------------------------------------------------
+            # 배음(harmonic) 모호성 경고 — "조용히 절반으로 나온 pitch" 방지
+            # ---------------------------------------------------------------
+            # 탐색 상한은 max_pitch = n * max_pitch_ratio 다. 만약 참 pitch 가
+            # 이 상한을 넘으면 FFT 는 그 값을 아예 후보로 볼 수 없고, 대신
+            # 2배음(참값/2)에 피크가 잡힌다. 이때 모든 채널이 똑같이 절반값을
+            # 보므로 agreement=1.00 이 되어 기존 경고는 하나도 울리지 않는다.
+            #
+            # 실측 사례: 참 pitch=400 인 3x3 die 이미지 -> 199.57 (오차 50%),
+            #            agree=1.00, 경고 0건. 완전히 조용한 오답.
+            #
+            # 판정 기준은 "2T 가 탐색 밴드 안에 있었는가" 다.
+            #   2*pitch <= max_pitch  -> 2T 도 후보였는데 밀렸다 = 신뢰 가능
+            #   2*pitch >  max_pitch  -> 2T 는 검사조차 못했다 = 배제 불가
+            #
+            # 단, 사용자가 pitch 를 직접 지정했다면 이미 정답을 아는 것이므로
+            # 경고하지 않는다 (불필요한 소음).
+            n_periods = n_prof / max(pitch_local, _EPS)
+            max_pitch = max(cfg.min_pitch_px * 3.0, n_prof * cfg.max_pitch_ratio)
+            user_fixed = (cfg.pitch_x if axis == "x" else cfg.pitch_y) is not None
+            if user_fixed:
+                pass
+            elif 2.0 * pitch_local > max_pitch:
+                diag.warn(
+                    f"[{axis}] pitch {pitch:.2f}px 는 탐색 상한 "
+                    f"({max_pitch / max(scale, _EPS):.0f}px) 때문에 2배값을 "
+                    f"검증하지 못했습니다 — 참 pitch 가 이 값의 2배일 수 있습니다 "
+                    f"(프로파일에 약 {n_periods:.1f}주기만 보임). "
+                    f"die 가 크거나 시야가 좁으면 max_pitch_ratio 를 올리거나 "
+                    f"pitch_{axis} 를 직접 지정하세요.")
+            elif n_periods < 4.0:
+                diag.warn(
+                    f"[{axis}] 프로파일에 약 {n_periods:.1f}주기만 보입니다 "
+                    f"— 주기 추정이 불안정할 수 있습니다 (4주기 이상 권장).")
 
         out.extend([pitch, origin])
 
@@ -1550,6 +1759,7 @@ def estimate_grid_angle_adaptive(img_bgr: np.ndarray,
     projection 탐색(coarse -> fine -> 포물선)과 2D-FFT 를 교차검증한다.
     """
     cfg = profile or ColorProfile()
+    img_bgr = _load_bgr(img_bgr)          # 단독 호출 대비 입력 정규화
     roi, _, _ = _grid_roi(img_bgr, wafer_cx, wafer_cy, wafer_r, 0.55)
     if roi.size == 0 or min(roi.shape[:2]) < 64:
         return 0.0, None, 0.0, False

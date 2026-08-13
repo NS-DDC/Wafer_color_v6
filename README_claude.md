@@ -226,6 +226,55 @@ runs are byte-for-byte unchanged.
 
 ---
 
+## Independent target set: `NaturalColorSeries`
+
+A separate set of AI-generated wafers with thin, natural saw streets — not produced by
+this project's generator, so it is an independent check. Reference die size and die count
+come from that set's own README.
+
+| image | v6 die | ref die | v6 dies | ref dies | Δ | warn | v5 |
+|---|---|---|---|---|---|---|---|
+| `natural_teal_bluegray` | 38×28 | 38×28 | 1133 | 1129 | 0.35% | 0 | **fails** |
+| `natural_amber_olive_bronze` | 38×28 | 38×28 | 1131 | 1129 | 0.18% | 0 | **fails** |
+| `natural_rose_violet_iceblue` | 38×28 | 38×28 | 1132 | 1129 | 0.27% | 0 | **fails** |
+| `white_brown_natural_streets_ai` | 35×36 | 35×36 | 865 | 867 | 0.23% | 0 | **silently wrong** |
+
+v6: **4/4**, die size exact on every image, count within 0.35% (the residual is edge-die
+inclusion policy), no warnings, ~1 s each.
+
+v5: the three `natural_*` images raise `RuntimeError: No wafer street/grid line was found
+near wafer center`. `white_brown_natural_streets_ai` is the worse case — v5 returns
+**no error at all** while reporting pitch `(70.00, 62.50)` against a true `(35.11, 35.74)`,
+i.e. exactly double, and 248 dies instead of 865. That silent doubling is the failure mode
+this project was created to remove.
+
+---
+
+## Input hardening
+
+Static review plus dynamic probing turned up five ways to get a *silently wrong* answer.
+Each was reproduced first, then fixed, then re-checked against the full regression.
+
+| # | Problem | Observed before fix | Now |
+|---|---|---|---|
+| 1 | `ColorProfile` had no validation | `max_pitch_ratio=0` → pitch `(22.0, 14.7)`, 19,111 dies vs true 88/88 and 800 dies — **zero warnings**. `pitch_x=3.0` (below `min_pitch_px=8`) → 684,887 dies. `background_bgr=(999,…)` → raw `OverflowError` from NumPy | `__post_init__` validates every field and raises `ValueError` with a message naming the field, the bad value, and the accepted range |
+| 2 | Pitch silently halved when the true pitch exceeds the FFT search band | true 400 px → 199.57 (49.8% error) with `agreement=1.00` and **zero warnings**, because every channel agreed on the same wrong half | Warns when `2·pitch > max_pitch`, i.e. when 2T was never inside the band and therefore could not be ruled out |
+| 3 | Non-`uint8` input silently shifted the result | `float32` in 0–255 → 88.43 vs 87.98, no error. `cv2.cvtColor(…, BGR2LAB)` reads `float32` as 0–1, so Lab saturates | `_load_bgr` normalizes `uint16`/`float32`/`float64`/`bool`, auto-detecting 0–1 vs 0–255 scale |
+| 4 | 4-channel BGRA accepted by the public helpers | `detect_wafer_adaptive(bgra)` returned a result instead of rejecting | Alpha dropped at the single input gate; all public entry points normalize |
+| 5 | CLI `--polarity` violated its own type contract | mapped to `int` (`1`/`-1`/`0`) but the field is `Optional[str]`; worked only because `str()` happened to be called downstream | Normalized in `__post_init__`, so `"bright"`, `"dark"`, `"auto"`, `1`, `-1`, `0` and `None` are all accepted and the documented `street_polarity=-1` form now genuinely works |
+
+Note on #2: the obvious check — "warn if fewer than 4 periods are visible" — **would not
+have caught it**. The failing case had 4.35 visible periods. The correct test is whether
+the 2× candidate was ever inside the search band at all.
+
+After normalization, `uint8`, BGRA, `float32` (both 0–1 and 0–255), `float64` and `uint16`
+all return byte-identical results; `(H,W,5)` and `(H,W,2)` now fail loudly.
+
+Regression after all five fixes: **29/29 synthetic, 4/4 real, 4/4 NaturalColorSeries, 0
+failures**, and no new warnings on any previously-clean image.
+
+---
+
 ## CLI
 
 ```bash
@@ -255,6 +304,13 @@ dm = build_die_map_v6("wafer.png", profile=ColorProfile(
   (projection ≈ 0.00°, FFT ≈ 1.05°). Flagged as `CHECK WARNINGS`, not hidden.
 - `real_exposed_top_p078` reports low y-phase confidence (0.21) — pitch is exact, but the
   street position within the period is less certain.
+- **Very large pitch relative to the field of view.** The FFT search band tops out at
+  `profile_length × max_pitch_ratio` (0.34), so a true pitch above that cannot be a
+  candidate and a sub-harmonic is picked instead. Fewer than ~5 dies visible across the
+  wafer triggers this. The ½ case now warns; a ⅓-or-lower mis-pick can still be silent
+  when streets are unusually thick (measured: true 300 px with 30 px streets → 30 px).
+  Real wafer maps show 20–40+ dies across and are unaffected. If you work with zoomed
+  crops, set `pitch_x`/`pitch_y` explicitly or raise `max_pitch_ratio` to ~0.45.
 - Grid *phase* within a period is partly conventional: a rigid shift of a periodic tiling
   is self-consistent, so die-to-die similarity cannot pin it down. What is validated here
   is pitch exactness, phase stability across color variants, and landing inside a scribe
