@@ -30,6 +30,11 @@ print("origin:", dm.x0, dm.y0)
 print("detected dies:", dm.num_dies)
 ```
 
+기본 `origin_mode="nearest_center"`은 wafer 중심에 유클리드 거리로 가장 가까운
+grid 교차점을 `(x0, y0)`으로 사용합니다. 기존 V5의 인덱스 기준(중심 바로 위
+street)을 유지해야 하면 `ColorRobustConfig(origin_mode="upper_right")`를
+명시하십시오.
+
 기본 설정은 색상과 명암 변화에 모두 대응하는 `auto` 모드이며, 작은 회전은
 자동 보정합니다.
 

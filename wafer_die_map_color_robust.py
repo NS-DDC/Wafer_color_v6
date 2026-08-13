@@ -54,6 +54,16 @@ class ColorRobustConfig:
     max_angle_deg: float = 12.0
     angle_min_line_length_ratio: float = 0.16
     clean: bool = True
+    origin_mode: Literal["nearest_center", "upper_right"] = "nearest_center"
+    """Grid-index reference point.
+
+    ``"nearest_center"`` (default) uses the grid street intersection with the
+    shortest Euclidean distance to the detected wafer centre.  This is the
+    most intuitive reference for visual inspection.  ``"upper_right"`` keeps
+    the original V5 convention: choose the closest vertical street but the
+    horizontal street immediately above the centre, so the die to the
+    upper-right is index ``(0, 0)``.
+    """
 
 
 def _normalize01(values: np.ndarray) -> np.ndarray:
@@ -162,10 +172,12 @@ def _gradient_grid_candidate(image_bgr: np.ndarray, wafer_cx: int, wafer_cy: int
     py = float(v5._autocorr_period(row, min_lag=config.min_pitch, max_lag=config.max_pitch))
     phx, phy = _periodic_phase(col, px), _periodic_phase(row, py)
 
-    # Origin convention is exactly the V5 convention: vertical boundary near
-    # wafer centre and the horizontal boundary immediately above it.
+    # The default is the actual closest grid intersection to wafer centre.
+    # ``upper_right`` remains available for old V5 index semantics.
     kx = int(round((wafer_cx - x1 - phx) / px))
-    ky = int(np.floor((wafer_cy - y1 - phy) / py))
+    ky_unrounded = (wafer_cy - y1 - phy) / py
+    ky = int(round(ky_unrounded) if config.origin_mode == "nearest_center"
+             else np.floor(ky_unrounded))
     x0 = int(round(x1 + phx + kx * px))
     y0 = int(round(y1 + phy + ky * py))
     quality = _candidate_quality(col, px, phx) + _candidate_quality(row, py, phy)
@@ -179,6 +191,10 @@ def _std_grid_candidate(image_bgr: np.ndarray, wafer_cx: int, wafer_cy: int,
     px, py, x0, y0 = v5.detect_grid(
         image_bgr, wafer_cx, wafer_cy, wafer_r, method="std",
         roi_ratio=config.roi_ratio, min_pitch=config.min_pitch, max_pitch=config.max_pitch)
+    if config.origin_mode == "nearest_center":
+        # V5 returns the street immediately above centre.  Shift by an
+        # integral period to the truly closest crossing without changing grid.
+        y0 = int(round(y0 + round((wafer_cy - y0) / py) * py))
     gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)
     half = max(80, int(wafer_r * config.roi_ratio))
     x1, x2 = max(0, wafer_cx - half), min(gray.shape[1], wafer_cx + half)
@@ -231,6 +247,7 @@ def detect_grid_color_robust(image_bgr: np.ndarray, wafer_cx: int, wafer_cy: int
         "selected_method": name,
         "quality": float(score),
         "phase_refinement": phase_info,
+        "origin_mode": config.origin_mode,
         "candidates": [{"method": n, "pitch_x": a, "pitch_y": b, "quality": q}
                        for n, a, b, _, _, q, _ in candidates],
         "errors": errors,
