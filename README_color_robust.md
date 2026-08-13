@@ -56,6 +56,7 @@ dm = build_die_map_robust("wafer.png", config=cfg)
 
 ```powershell
 python test_color_robust.py
+python test_adversarial_color_robust.py
 ```
 
 실행하면 `_color_robust_diagnostics`에 초록색 grid overlay가 생성됩니다.
