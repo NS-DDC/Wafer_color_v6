@@ -12,7 +12,8 @@ separate:
 | `wafer_die_map_v5.py` | `build_die_map()` | Original implementation, retained unchanged. |
 
 For the recommended colour-robust V5-compatible workflow, see
-[USAGE.md](USAGE.md). For the independently contributed standalone V6 path,
+[USAGE.md](USAGE.md) and the visual explanation in
+[HOW_IT_WORKS_VISUAL.md](HOW_IT_WORKS_VISUAL.md). For the independently contributed standalone V6 path,
 see [README_claude.md](README_claude.md).
 
 ## Quick start

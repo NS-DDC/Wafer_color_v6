@@ -215,3 +215,6 @@ python test_angle_alignment.py
 `wafer_color_v6_claude.py`와 `README_claude.md`는 다른 기여자가 별도로 만든
 독립 구현입니다. 이 문서의 API, 테스트, 설정값은 그 파일이 아니라
 `wafer_die_map_color_robust.py`에만 해당합니다.
+
+파라미터가 어느 단계에 영향을 주는지와 전체 처리 흐름은
+[HOW_IT_WORKS_VISUAL.md](HOW_IT_WORKS_VISUAL.md)를 참고하십시오.
