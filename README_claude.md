@@ -25,6 +25,14 @@ Both engines run on the same image put through 15 color transforms. PASS = pitch
 | `real_casio_top_p092` | **15/15 (100%)** | 8/15 (53%) |
 | `real_piper_top_p088` | **15/15 (100%)** | 0/15 (0%) |
 
+Plus 29 synthetic wafers rendered with *known* ground truth across 29 color palettes
+(isoluminant, isochromatic, neon, pastel, sepia, copper, bright background, ±3° rotation,
+anisotropic pitch, heavy noise, JPEG q35, and more):
+
+| | v6 | v5 |
+|---|---|---|
+| synthetic palettes | **29/29 (100%)** | 0/29 (0%) |
+
 On the four images whose filenames encode ground-truth pitch, v6 recovers it exactly:
 
 | image | truth | v6 pitch x / y | dies |
@@ -138,6 +146,49 @@ sepia, cool_tint, noise12, illum_grad, white_street_brown`.
 `white_street_brown` reproduces the originally reported failure directly: invert inside
 the wafer so dark streets become bright, push the brightest 30% toward white, then speckle
 brown over it. v6 holds at 92.001/92.011 with 724 dies (1.09% deviation).
+
+**Synthetic ground-truth harness** — `make_color_wafers_claude.py` renders wafers from
+scratch across 29 color palettes, so pitch, center, radius, rotation and street phase are
+*known exactly* rather than inferred. Transform-based harnesses can only perturb an
+existing image; they cannot reach color combinations the source never had.
+
+```bash
+python make_color_wafers_claude.py --out synth --eval --v5   # generate + score
+python make_color_wafers_claude.py --list                    # show palettes
+```
+
+| | v6 | v5 |
+|---|---|---|
+| synthetic palettes passed | **29 / 29 (100%)** | 0 / 29 (0%) |
+
+Tolerances: pitch ≤1%, center ≤15px, radius ≤3%, angle ≤0.5°, street phase ≤25% of pitch.
+Palettes cover isoluminant (die and street share luminance, differ only in hue),
+isochromatic (identical hue, differ only in luminance), neon, pastel, sepia, green PCB,
+copper, cyan-on-white, bright background, rim ring, ±3° rotation, anisotropic pitch
+(76×48), pitch 28 and 150, left notch, σ=20 noise, JPEG q35, strong illumination gradient,
+blur, and a composite worst case.
+
+Rendering uses analytic rotated coordinates (`u = dx·cos a + dy·sin a`) rather than
+rotating a rendered image, so the ground-truth angle carries no interpolation error.
+Seeds come from `zlib.crc32(name)`, not the built-in `hash()`, which is randomized per
+process and would make results irreproducible.
+
+Two v6 defects were found and fixed by this harness:
+
+- **Harmonic mis-pick.** `_spectral_pitch` can land on the 2nd harmonic. Measured on a
+  low-contrast palette: spectral peak 129 px, but r(64)=+0.78 vs r(128)=+0.86. Since T/2
+  repeats essentially as well, the fundamental is 64. `_resolve_period_multiple` now
+  demotes (`r_half ≥ 0.5` and `r_half ≥ r_full − 0.12`) as well as promotes, and promotion
+  is gated so a strong fundamental is never overridden by a marginally higher multiple.
+- **Wafer mask fragmentation.** A fixed morphological close kernel cannot bridge wide
+  scribe lanes. At pitch 150 / lane 13 px the mask split into 376 separate dies, so
+  `findContours(RETR_EXTERNAL)` returned *one die* as the largest contour, coverage read
+  0.007, and detection fell back to the image inscribed circle (r=799 vs true 700).
+  Closing is now progressive: the kernel grows until the largest contour holds ≥85% of the
+  foreground area, capped at 4% of `min(H, W)`.
+
+Both fixes were regression-checked: the 6 real images and both 15-transform robustness
+runs are byte-for-byte unchanged.
 
 ---
 

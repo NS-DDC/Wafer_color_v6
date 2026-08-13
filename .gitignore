@@ -1,3 +1,6 @@
 __pycache__/
 *.py[cod]
 _color_robust_diagnostics/
+
+# agent runtime state
+.omc/

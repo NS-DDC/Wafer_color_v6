@@ -1,0 +1,38 @@
+ SYNTHETIC GROUND-TRUTH HARNESS   29 palettes
+=========================================================================
+ spec                  | V6                                            
+                       | verdict pitch  center radius angle phase  dies
+-------------------------------------------------------------------------
+ 01_classic_dark       | PASS p 0.02% c  0.0 r 0.0% a0.00 ph   0% n  376
+ 02_classic_bright     | PASS p 0.06% c  0.0 r 0.0% a0.00 ph   1% n  300
+ 03_bright_street      | PASS p 0.06% c  0.0 r 0.0% a0.00 ph   2% n  432
+ 04_white_street_brown | PASS p 0.03% c  0.0 r 0.0% a0.00 ph   1% n  332
+ 05_grayscale          | PASS p 0.05% c  0.0 r 0.0% a0.00 ph   2% n  486
+ 06_isoluminant        | PASS p 0.03% c  0.0 r 0.0% a0.00 ph   6% n  379
+ 07_isochromatic       | PASS p 0.04% c  0.0 r 0.0% a0.00 ph   2% n  376
+ 08_neon               | PASS p 0.01% c  0.0 r 0.0% a0.00 ph   2% n  432
+ 09_pastel             | PASS p 0.11% c  0.0 r 0.0% a0.00 ph   5% n  352
+ 10_sepia              | PASS p 0.02% c  0.0 r 0.0% a0.00 ph   2% n  376
+ 11_green_pcb          | PASS p 0.05% c  0.0 r 0.0% a0.00 ph   0% n  316
+ 12_copper             | PASS p 0.02% c  0.0 r 0.0% a0.00 ph   2% n  392
+ 13_purple             | PASS p 0.02% c  0.0 r 0.0% a0.00 ph   2% n  460
+ 14_cyan_on_white      | PASS p 0.01% c  0.0 r 0.0% a0.00 ph   2% n  376
+ 15_lowcontrast        | PASS p 0.64% c  0.0 r 0.0% a0.00 ph   5% n  380
+ 16_bright_bg          | PASS p 0.04% c  0.0 r 0.0% a0.00 ph  11% n  380
+ 17_rim_ring           | PASS p 0.01% c  0.0 r 0.0% a0.00 ph   2% n  376
+ 18_rot_p3             | PASS p 0.04% c  0.0 r 0.0% a0.00 ph  -   n  376
+ 19_rot_m2             | PASS p 0.06% c  0.0 r 0.1% a0.00 ph  -   n  332
+ 20_aniso_pitch        | PASS p 0.02% c  0.0 r 0.0% a0.00 ph   2% n  422
+ 21_small_pitch        | PASS p 0.01% c  0.0 r 0.0% a0.00 ph   4% n 1972
+ 22_large_pitch        | PASS p 0.21% c  0.0 r 0.0% a0.00 ph   1% n   68
+ 23_notch_left         | PASS p 0.03% c  0.0 r 0.0% a0.00 ph   2% n  376
+ 24_heavy_noise        | PASS p 0.04% c  0.0 r 0.0% a0.00 ph   3% n  378
+ 25_jpeg_low           | PASS p 0.02% c  0.0 r 0.0% a0.00 ph   3% n  376
+ 26_illum_strong       | PASS p 0.03% c  0.0 r 0.0% a0.00 ph   3% n  376
+ 27_blur_soft          | PASS p 0.04% c  0.0 r 0.1% a0.00 ph   2% n  376
+ 28_speckle_die        | PASS p 0.11% c  0.0 r 0.0% a0.00 ph   2% n  376
+ 29_worst_case         | PASS p 0.33% c  0.0 r 0.0% a0.00 ph  -   n  376
+-------------------------------------------------------------------------
+ TOTAL                 | 29/29 pass (100%)                             
+=========================================================================
+JSON -> synth_results.json

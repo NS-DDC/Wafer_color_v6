@@ -544,9 +544,29 @@ def detect_wafer_adaptive(img_bgr: np.ndarray,
     mask = cv2.morphologyEx(
         mask, cv2.MORPH_OPEN,
         cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (ko, ko)))
-    mask = cv2.morphologyEx(
-        mask, cv2.MORPH_CLOSE,
-        cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kc, kc)))
+    # --- 점진적 CLOSE -------------------------------------------------
+    # 고정 커널은 scribe lane 이 넓으면(예: pitch 150 / lane 13px) lane 을
+    # 못 메워서 마스크가 die 단위로 산산조각 난다. 그러면 RETR_EXTERNAL 의
+    # '가장 큰 컨투어' 가 die 하나가 되어 coverage~0 오판이 난다.
+    # -> 최대 컨투어가 전경 면적의 대부분을 차지할 때까지 커널을 키운다.
+    fg = float(np.count_nonzero(mask))
+    k_max = _odd(max(kc, int(round(0.04 * min(H, W)))))
+    k = _odd(kc)
+    closed = mask
+    while True:
+        closed = cv2.morphologyEx(
+            mask, cv2.MORPH_CLOSE,
+            cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (k, k)))
+        cs, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL,
+                                 cv2.CHAIN_APPROX_SIMPLE)
+        if not cs or fg < _EPS:
+            break
+        if cv2.contourArea(max(cs, key=cv2.contourArea)) >= 0.85 * fg:
+            break
+        if k >= k_max:
+            break
+        k = _odd(min(k_max, int(round(k * 1.8)) + 1))
+    mask = closed
 
     cnts, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     fallback = ""
@@ -733,7 +753,9 @@ def _spectral_pitch(p: np.ndarray, min_pitch: float,
 
 
 def _resolve_period_multiple(prof: np.ndarray, pitch: float,
-                             max_pitch: float, margin: float = 0.06
+                             max_pitch: float, min_pitch: float = 0.0,
+                             margin: float = 0.06,
+                             gap: float = 0.25, strong: float = 0.75
                              ) -> Tuple[float, str]:
     """반주기(half-period) 오검출 교정 -> (pitch, note).
 
@@ -744,10 +766,34 @@ def _resolve_period_multiple(prof: np.ndarray, pitch: float,
     실측: portable_bw_sample 의 X 축에서 pitch 45 로 잡혔지만
     r(45) = -0.105 (역위상!) / r(90) = +0.997 — 진짜 주기는 90 이었다.
 
-    규칙: T, 2T, 3T 중 자기상관 최대값에서 ``margin`` 이내인 것 중
-    **가장 작은** 것을 채택한다. 진짜 주기 T 면 r(T) 가 이미 최대라 T 가 남고,
-    T 가 반주기면 r(T) 만 낮아 2T 로 승격된다.
+    규칙: 승격은 "T 에서 반복이 실제로 깨질 때" 만 한다.
+      (1) r(T) 가 충분히 높으면(>= ``strong``) 무조건 T 를 유지한다.
+      (2) 최대값과 r(T) 의 차이가 ``gap`` 미만이면 T 를 유지한다.
+    두 관문을 모두 통과했을 때만 T, 2T, 3T 중 최대값에서 ``margin`` 이내인
+    **가장 작은** 것으로 승격한다.
+
+    이 관문이 필요한 이유(실측): 15_lowcontrast 는 r(64)=+0.67,
+    r(128)=+0.78 로 128 이 근소하게 높지만 진짜 주기는 64 다. 단순히
+    "더 큰 쪽" 을 고르면 저대비 영상에서 주기가 2배로 부풀어 오른다.
+
+    반대 방향(강등)도 같은 논리로 처리한다. 스펙트럼 피크는 2고조파에
+    얹힐 수 있어서 진짜 주기의 2배가 잡히기도 한다(실측 15_lowcontrast X:
+    스펙트럼 129, r(64)=+0.78 / r(128)=+0.86). T/2 에서도 사실상 똑같이
+    잘 반복되면 기본 주기는 T/2 다.
     """
+    # ---- 강등: T/2 에서도 거의 같은 수준으로 반복되면 T 는 2고조파다 ----
+    half = pitch * 0.5
+    if half >= max(min_pitch, 2.0):
+        xh = _detrend(prof, _odd(int(round(pitch * 2)) + 1))
+        if float(xh.std()) > _EPS:
+            r_full = _corr_at_lag(xh, pitch)
+            r_half = _corr_at_lag(xh, half)
+            if r_half >= 0.5 and r_half >= r_full - 0.12:
+                ref = _spectral_pitch(prof, half * 0.90,
+                                      min(half * 1.12, max_pitch))
+                c = ref if (ref and abs(ref - half) / half <= 0.05) else half
+                return float(c), f"/2 (r={r_full:+.2f}->{r_half:+.2f})"
+
     cands = [pitch * m for m in (1, 2, 3) if pitch * m <= max_pitch]
     if len(cands) < 2:
         return float(pitch), ""
@@ -759,6 +805,11 @@ def _resolve_period_multiple(prof: np.ndarray, pitch: float,
     rs = [_corr_at_lag(xd, c) for c in cands]
     best = max(rs)
     if best <= 0.0:
+        return float(pitch), ""
+
+    # 승격 관문: T 에서 이미 반복이 잘 되면(또는 근소한 차이면) 건드리지 않는다.
+    r1 = rs[0]
+    if r1 >= strong or (best - r1) < gap:
         return float(pitch), ""
 
     for c, r in zip(cands, rs):
@@ -891,7 +942,8 @@ def _analyze_channel(name: str, prof1d: np.ndarray,
     # 반주기 오검출 교정 (사용자가 pitch 를 직접 준 경우는 건드리지 않는다)
     mult_note = ""
     if not fixed_pitch:
-        pitch, mult_note = _resolve_period_multiple(prof1d, pitch, max_pitch)
+        pitch, mult_note = _resolve_period_multiple(
+            prof1d, pitch, max_pitch, cfg.min_pitch_px)
     res.pitch = float(pitch)
 
     # pitch 를 알았으니 그 2배 창으로 detrend -> 주기 성분만 남긴다
