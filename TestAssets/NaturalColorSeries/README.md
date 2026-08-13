@@ -19,3 +19,8 @@ geometry was visually inspected, and all three images were tested by
 of the white/brown street condition. It deliberately has no artificial grid
 outside the wafer and no square-tile intersections. Its regression test is
 `test_white_brown_natural_streets.py`.
+
+`white_brown_natural_streets_ai_grid_center.png` is the visual acceptance
+result: yellow lines are the detected grid and the red crosshair is the
+detected wafer centre. Regenerate it with
+`python make_white_brown_fixture_diagnostic.py`.
