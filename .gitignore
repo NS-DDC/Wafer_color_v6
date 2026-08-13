@@ -1,6 +1,7 @@
 __pycache__/
 *.py[cod]
 _color_robust_diagnostics/
+TestAssets/ColorVariants/*_overlay.jpg
 
 # agent runtime state
 .omc/

@@ -32,11 +32,20 @@ die map을 만들었습니다.
 반복되는 직교 die grid, 흰색·tan·갈색·푸른 회색 street, salt-and-pepper noise,
 불균일 조명, 약 2도 회전, 텍스트/워터마크 없음.
 
+## 4. 실제 geometry 기반 색상 fixture 7종
+
+`generate_color_variants.py`는 실제 84 px wafer의 die geometry를 보존한 상태에서
+street만 흰색/갈색, cyan/magenta, gold/blue, purple/green, 저대비 어두운 색,
+다색 speckle로 각각 바꿉니다. 마지막 fixture는 흰색/갈색 noisy street에 5도
+회전도 적용합니다. 결과 파일은 `TestAssets/ColorVariants/`에 있고,
+`test_color_variants.py`가 모두 84 x 84 px pitch를 유지하는지 검증합니다.
+
 ## 실행
 
 ```powershell
 python test_color_robust.py
 python test_adversarial_color_robust.py
+python test_color_variants.py
 ```
 
 두 스크립트는 외부 데이터 다운로드 없이 이 저장소의 `Img/`와 `TestAssets/`만

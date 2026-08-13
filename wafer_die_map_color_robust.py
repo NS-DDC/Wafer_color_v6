@@ -48,6 +48,9 @@ class ColorRobustConfig:
     blur_sigma: float = 1.2
     projection_smooth: int = 7
     angle_align: Literal["robust", "none"] = "robust"
+    phase_refine: bool = True
+    phase_refine_search_px: int = 18
+    phase_refine_max_shift_px: int = 14
     max_angle_deg: float = 12.0
     angle_min_line_length_ratio: float = 0.16
     clean: bool = True
@@ -110,6 +113,42 @@ def _candidate_quality(profile: np.ndarray, pitch: float, phase: float) -> float
     return contrast / noise
 
 
+def _periodic_line_alignment(response: np.ndarray, predicted_origin: int,
+                              pitch: float, center: int, search_px: int,
+                              max_shift_px: int) -> Tuple[int, float, float]:
+    """Refine a grid phase by maximizing *every* expected street response.
+
+    Autocorrelation gives reliable pitch, but a peak in an edge image can be
+    either side of a thick street.  This searches a small shared phase shift
+    and scores all periodic line locations, not just one local maximum.  A
+    conservative shift guard prevents a circuit pattern from moving the whole
+    map by a large fraction of a die.
+    """
+    response = response.astype(np.float64)
+    pitch = float(pitch)
+    if pitch <= 2.0 or response.size < 3:
+        return int(predicted_origin), 0.0, 0.0
+    line_ids = np.arange(-int(response.size / pitch) - 2,
+                         int(response.size / pitch) + 3)
+    best_shift, best_score = 0, -np.inf
+    for shift in range(-int(search_px), int(search_px) + 1):
+        positions = np.rint(predicted_origin + shift + line_ids * pitch).astype(np.int32)
+        positions = positions[(positions >= 0) & (positions < response.size)]
+        if positions.size < 5:
+            continue
+        # A street produces an energy band; max in +-2 px makes the refinement
+        # robust to subpixel sampling and line width without changing phase.
+        samples = np.stack([response[np.clip(positions + delta, 0, response.size - 1)]
+                            for delta in (-2, -1, 0, 1, 2)], axis=1)
+        score = float(np.mean(np.max(samples, axis=1)))
+        if score > best_score:
+            best_shift, best_score = shift, score
+    if abs(best_shift) > int(max_shift_px):
+        return int(predicted_origin), 0.0, float(best_score)
+    confidence = float((best_score - np.median(response)) / (np.std(response) + 1e-6))
+    return int(round(predicted_origin + best_shift)), float(best_shift), confidence
+
+
 def _gradient_grid_candidate(image_bgr: np.ndarray, wafer_cx: int, wafer_cy: int,
                              wafer_r: int, config: ColorRobustConfig
                              ) -> Tuple[float, float, int, int, float, Dict[str, np.ndarray]]:
@@ -130,7 +169,8 @@ def _gradient_grid_candidate(image_bgr: np.ndarray, wafer_cx: int, wafer_cy: int
     x0 = int(round(x1 + phx + kx * px))
     y0 = int(round(y1 + phy + ky * py))
     quality = _candidate_quality(col, px, phx) + _candidate_quality(row, py, phy)
-    return px, py, x0, y0, quality, {"gx": gx, "gy": gy, "col": col, "row": row}
+    return px, py, x0, y0, quality, {"gx": gx, "gy": gy, "col": col, "row": row,
+                                     "x1": x1, "y1": y1}
 
 
 def _std_grid_candidate(image_bgr: np.ndarray, wafer_cx: int, wafer_cy: int,
@@ -155,30 +195,44 @@ def detect_grid_color_robust(image_bgr: np.ndarray, wafer_cx: int, wafer_cy: int
                              wafer_r: int, config: ColorRobustConfig = ColorRobustConfig(),
                              ) -> Tuple[float, float, int, int, Dict[str, Any]]:
     """Find die pitch/origin without using fixed hue, saturation, or brightness rules."""
-    candidates: List[Tuple[str, float, float, int, int, float]] = []
+    candidates: List[Tuple[str, float, float, int, int, float, Optional[Dict[str, np.ndarray]]]] = []
     errors: List[str] = []
     if config.mode in ("auto", "gradient"):
         try:
-            px, py, x0, y0, q, _ = _gradient_grid_candidate(
+            px, py, x0, y0, q, diag = _gradient_grid_candidate(
                 image_bgr, wafer_cx, wafer_cy, wafer_r, config)
-            candidates.append(("gradient", px, py, x0, y0, q))
+            candidates.append(("gradient", px, py, x0, y0, q, diag))
         except Exception as exc:  # fallback candidates are intentional
             errors.append(f"gradient: {exc}")
     if config.mode in ("auto", "std"):
         try:
             px, py, x0, y0, q = _std_grid_candidate(image_bgr, wafer_cx, wafer_cy, wafer_r, config)
-            candidates.append(("std", px, py, x0, y0, q))
+            candidates.append(("std", px, py, x0, y0, q, None))
         except Exception as exc:
             errors.append(f"std: {exc}")
     if not candidates:
         raise RuntimeError("No robust grid candidate succeeded. " + "; ".join(errors))
 
-    name, px, py, x0, y0, score = max(candidates, key=lambda item: item[-1])
+    name, px, py, x0, y0, score, diag = max(candidates, key=lambda item: item[5])
+    phase_info: Dict[str, float] = {"shift_x": 0.0, "shift_y": 0.0,
+                                    "confidence_x": 0.0, "confidence_y": 0.0}
+    if config.phase_refine and diag is not None:
+        # Use full-image directional edge responses for a central geometry
+        # anchor; the candidate's ROI was used only for pitch estimation.
+        x0, sx, cx_score = _periodic_line_alignment(
+            diag["gx"].mean(axis=0), x0, px, wafer_cx,
+            config.phase_refine_search_px, config.phase_refine_max_shift_px)
+        y0, sy, cy_score = _periodic_line_alignment(
+            diag["gy"].mean(axis=1), y0, py, wafer_cy,
+            config.phase_refine_search_px, config.phase_refine_max_shift_px)
+        phase_info = {"shift_x": sx, "shift_y": sy,
+                      "confidence_x": cx_score, "confidence_y": cy_score}
     return px, py, x0, y0, {
         "selected_method": name,
         "quality": float(score),
+        "phase_refinement": phase_info,
         "candidates": [{"method": n, "pitch_x": a, "pitch_y": b, "quality": q}
-                       for n, a, b, _, _, q in candidates],
+                       for n, a, b, _, _, q, _ in candidates],
         "errors": errors,
     }
 
@@ -270,11 +324,25 @@ def build_die_map_robust(image: Union[str, Path, np.ndarray], *,
     wafer_cx, wafer_cy, wafer_r = _detect_wafer_robust(img)
 
     rotation_deg, angle_confidence = 0.0, 1.0
+    angle_source = "none"
     if config.angle_align == "robust":
-        rotation_deg, angle_confidence = _estimate_grid_angle(img, wafer_cx, wafer_cy, wafer_r, config)
-        if abs(rotation_deg) >= 0.05 and angle_confidence >= 0.15:
-            img = v5._rotate_wafer_keep_size(img, wafer_cx, wafer_cy, rotation_deg)
+        # The V5 projection+FFT alignment is substantially more accurate than
+        # a single Hough estimate for sub-degree residuals.  It does not use a
+        # fixed street colour; forcing its std pre-detector keeps this new path
+        # colour independent.  Hough remains a safe fallback for unusual data.
+        try:
+            img, rotation_deg, angle_info = v5.align_wafer_by_die_render(
+                img, grid_method="std", return_info=True)
+            angle_confidence = float(angle_info.get("confidence", 0.0))
+            angle_source = "projection_fft"
             wafer_cx, wafer_cy, wafer_r = _detect_wafer_robust(img)
+        except Exception:
+            rotation_deg, angle_confidence = _estimate_grid_angle(
+                img, wafer_cx, wafer_cy, wafer_r, config)
+            angle_source = "hough_fallback"
+            if abs(rotation_deg) >= 0.05 and angle_confidence >= 0.15:
+                img = v5._rotate_wafer_keep_size(img, wafer_cx, wafer_cy, rotation_deg)
+                wafer_cx, wafer_cy, wafer_r = _detect_wafer_robust(img)
 
     pitch_x, pitch_y, x0, y0, grid_info = detect_grid_color_robust(
         img, wafer_cx, wafer_cy, wafer_r, config)
@@ -324,7 +392,8 @@ def build_die_map_robust(image: Union[str, Path, np.ndarray], *,
         quadrant_report=report,
     )
     info: Dict[str, Any] = {"grid": grid_info, "rotation_deg": rotation_deg,
-                            "angle_confidence": angle_confidence, "config": config}
+                            "angle_confidence": angle_confidence,
+                            "angle_source": angle_source, "config": config}
     return (result, info) if return_info else result
 
 
