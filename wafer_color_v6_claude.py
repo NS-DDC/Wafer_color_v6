@@ -42,29 +42,365 @@ die 격자는 **어떤 팔레트에서도 공간적으로 주기적**이다. 그
 
 즉 V6 에는 "밝기 115 이상" 같은 절대 색 임계가 **하나도 없다**.
 
-사용법
-------
-    from wafer_color_v6_claude import build_die_map_v6, locate_die_v6
+====================================================================
+                          사 용 법  (USAGE)
+====================================================================
 
-    # (A) 완전 자동
+[1] 설치
+--------
+    pip install numpy opencv-python
+
+    이 파일 하나만 있으면 동작한다. (V5 를 import 하지 않음)
+    단, `--robustness` 의 "V5 와 비교" 기능만은 같은 폴더에
+    `wafer_die_map_v5.py` 가 있어야 한다. 없으면 비교를 건너뛰고
+    V6 결과만 출력한다.
+
+
+[2] 가장 간단한 사용 -- 완전 자동
+--------------------------------
+아무 파라미터도 주지 않으면 배경색·street 극성·feature 채널·pitch·
+위상·회전각을 전부 스스로 추정한다.
+
+    from wafer_color_v6_claude import build_die_map_v6
+
+    dm = build_die_map_v6("wafer.png")        # 경로 or np.ndarray(BGR)
+
+    print(dm.pitch_x, dm.pitch_y)             # die 한 칸의 픽셀 크기
+    print(dm.wafer_cx, dm.wafer_cy, dm.wafer_r)   # 웨이퍼 원 (px)
+    print(dm.rotation_deg)                    # 보정한 회전각 (deg)
+    print(len(dm.dies))                       # 검출된 die 개수
+
+`dm.dies` 는 **dict 의 리스트** 다. (dataclass 아님. dict 그대로 쓴다)
+
+    for d in dm.dies:
+        d["index"]           # (ix, iy)  격자 인덱스. 중심 근처가 (0,0) 부근
+        d["center_px"]       # (cx, cy)  die 중심 픽셀 좌표
+        d["rect_px"]         # (x0, y0, x1, y1)  die 경계 사각형
+        d["crop_rect_px"]    # margin/offset 을 반영한 실제 잘라낼 사각형
+        d["real_coord"]      # (X, Y)  pixel_per_unit 로 환산한 실좌표
+        d["is_edge_partial"] # 웨이퍼 경계에 걸쳐 잘린 die 인가
+        d["is_edge_ring"]    # 최외곽 링에 속하는가
+        d["is_edge"]         # 위 둘 중 하나라도 참인가
+
+    # 인덱스로 바로 찾기
+    d = dm.dies_by_index[(0, 0)]
+
+    # die 이미지 잘라내기 -> with_crops=True 로 만들면 d["image"] 에 들어온다
+    dm = build_die_map_v6("wafer.png", with_crops=True)
+    cv2.imwrite("die_0_0.png", dm.dies_by_index[(0, 0)]["image"])
+
+
+[3] 파라미터를 직접 주고 싶을 때 -- ColorProfile
+-----------------------------------------------
+아는 값만 넣으면 되고, 넣지 않은(None 인) 값은 전부 자동 추정된다.
+즉 "전부 자동" 과 "전부 수동" 사이의 어떤 조합도 가능하다.
+
+    from wafer_color_v6_claude import build_die_map_v6, ColorProfile
+
+    prof = ColorProfile(
+        # ---- 색 관련 (None 이면 자동) -------------------------------
+        background_bgr   = (255, 255, 255),  # 웨이퍼 바깥 배경색 (B,G,R)
+                                             #   None -> 코너 4곳에서 자동 추정
+        street_polarity  = "bright",         # "bright" | "dark" | None(=auto)
+                                             #   die 사이 street 가 밝은가 어두운가
+        feature_channels = ("chroma", "sat"),# 사용할 채널을 직접 지정
+                                             #   None -> 주기성 점수로 자동 선택
+
+        # ---- 격자 관련 (None 이면 자동) -----------------------------
+        pitch_x = 204.5,                     # 가로 pitch(px). None -> FFT 자동
+        pitch_y = 204.5,                     # 세로 pitch(px). None -> FFT 자동
+
+        # ---- 탐색 범위 조절 (기본값으로 충분한 경우가 대부분) --------
+        min_pitch_px     = 8.0,   # 이보다 작은 주기는 노이즈로 보고 무시
+        max_pitch_ratio  = 0.34,  # 최대 pitch = 웨이퍼 지름 * 이 비율
+        roi_ratio        = 0.62,  # 프로파일을 뽑을 중심 ROI 크기(지름 대비)
+        min_channel_score= 0.08,  # 이 점수 미만인 채널은 합의에서 제외
+        pitch_cluster_tol= 0.04,  # pitch 합의 시 같은 값으로 묶는 허용오차(4%)
+
+        # ---- 회전각 탐색 --------------------------------------------
+        angle_search_deg = 6.0,   # +-6도 범위를 훑는다
+        angle_coarse_step= 0.15,
+        angle_fine_step  = 0.02,
+        angle_full_scan_deg = 20.0,  # 6도 안에서 못 찾으면 +-20도로 확대
+
+        # ---- 웨이퍼 마스크 모폴로지 ---------------------------------
+        wafer_open_ksize  = 9,    # 점 노이즈 제거
+        wafer_close_ksize = 25,   # 구멍 메우기 시작 커널
+                                  #   (부족하면 내부에서 자동으로 키운다)
+        wafer_fill_bgr    = None, # 웨이퍼 안을 특정 색으로 칠할 때
+    )
+    dm = build_die_map_v6("wafer.png", profile=prof)
+
+feature_channels 로 쓸 수 있는 이름과 반응하는 상황:
+
+    "L"       밝기        : 검은 street <-> 밝은 die  (가장 흔함)
+    "a"       녹-적 축    : 색상이 반대쪽으로 갈리는 경우
+    "b"       청-황 축    : 파란 street <-> 노란 die 등
+    "chroma"  Lab 채도    : 흰색(무채) street <-> 유채색 die  ★
+    "sat"     HSV 채도    : chroma 와 비슷하나 밝기 영향이 다름
+    "maxmin"  max-min BGR : 무채/유채 대비. V5 가 쓰던 값과 같은 축
+    "stdL"    국소 표준편차: 색은 같은데 질감만 다른 경우 ★
+
+    ※ 그래디언트(Sobel) 채널은 일부러 넣지 않았다. street 하나가
+      "양쪽 두 개의 엣지" 로 보여서 위상이 모호해지고 pitch 가 절반으로
+      잘못 잡히기 때문이다.
+
+일부만 바꾸고 싶으면 `.merged()` 가 편하다.
+
+    prof2 = prof.merged(pitch_x=100.0, street_polarity=None)
+
+
+[4] build_die_map_v6() 의 나머지 인자
+------------------------------------
+    build_die_map_v6(
+        image,                    # 파일 경로(str) 또는 BGR np.ndarray
+        profile      = None,      # 위 ColorProfile. None -> 완전 자동
+        pixel_per_unit = 32,      # real_coord 환산 계수 (1 unit = 32 px)
+        include_edge = True,      # 경계에 걸친 die 도 포함할 것인가
+        edge_margin  = 1.0,       # 경계 판정 여유(die 크기 배수)
+        edge_mode    = "circle",  # is_edge 를 무엇으로 정할 것인가
+                                  #   "circle": 웨이퍼 원에 걸쳐 잘린 die
+                                  #             (= is_edge_partial)
+                                  #   "ring"  : 격자의 최외곽 링에 있는 die
+                                  #             (= is_edge_ring)
+                                  #   "both"  : 둘 중 하나라도 참이면 edge
+        with_crops   = False,     # True 면 각 die 이미지를 d["image"] 에 넣는다
+        border_mode  = "pad",     # "pad" | "crop"  (자를 영역이 이미지 밖일 때)
+                                  #   pad : 부족한 부분을 0 으로 채워 크기 유지
+                                  #   crop: 이미지 안쪽만 잘라 크기가 작아짐
+        offset_x = 0, offset_y = 0,   # 잘라낼 사각형을 통째로 이동
+        margin_x = 0, margin_y = 0,   # 잘라낼 사각형을 상하좌우로 확장
+        clean        = True,      # 웨이퍼 마스크 정리(구멍/돌기 제거)
+        align_angle  = True,      # 회전 보정 수행 여부
+        notch_ref_deg   = 90.0,   # notch 가 있어야 할 기준 방향(deg)
+        notch_sector_deg= 70.0,   # notch 를 찾을 각도 범위
+        verify_angle = True,      # 2D FFT 로 회전각 교차검증
+        verify_tol_deg = 0.5,     # 교차검증 허용 오차
+    ) -> WaferDieMapV6
+
+반환 객체 `WaferDieMapV6` 의 주요 속성:
+
+    wafer_cx, wafer_cy, wafer_r     웨이퍼 원 (회전 보정 후 좌표계)
+    pitch_x, pitch_y                die pitch (px)
+    x0, y0                          격자 원점 (die (0,0) 의 기준점)
+    die_w, die_h                    die 한 칸 크기 (= pitch 반올림)
+    dies, dies_by_index             die 목록 / 인덱스 조회용 dict
+    rotation_deg                    적용한 회전각 (deg)
+    aligned_image                   회전 보정된 이미지 (BGR)
+    wafer_mask                      웨이퍼 마스크 (uint8 0/255)
+    notch_center_px                 notch 중심 (없으면 None)
+    image_shape                     (H, W)
+    die_grid_angle_resid            격자 잔여 기울기 (deg)
+    angle_verified, angle_agree     회전각 검증 통과 여부
+    angle_confidence                회전각 신뢰도 0~1
+    quadrant_report                 사분면별 die 수 (편향 점검용)
+    diagnostics                     자가진단 객체 ([5] 참고)
+
+좌표 규약은 V5 와 동일하다 (기존 코드와 호환).
+
+    cx = x0 + ix * pitch_x + pitch_x / 2      # x 는 오른쪽이 +
+    cy = y0 - iy * pitch_y - pitch_y / 2      # y 는 위쪽이 +
+
+
+[5] 검증 3종
+------------
+(a) 자가진단 리포트 -- 결과를 믿어도 되는지 스스로 점검
+
     dm = build_die_map_v6("wafer.png")
+    print(dm.diagnostics.report())   # 사람이 읽는 텍스트 리포트
+    if not dm.diagnostics.ok:
+        print(dm.diagnostics.warnings)   # 경고 문자열 리스트
+    d = dm.diagnostics.to_dict()         # JSON 으로 저장할 때
 
-    # (B) 파라미터를 직접 줄 때 (아는 값만 주면 나머지는 자동)
-    from wafer_color_v6_claude import ColorProfile
-    dm = build_die_map_v6("wafer.png", profile=ColorProfile(
-             background_bgr=(255, 255, 255),   # 배경이 흰색
-             street_polarity="bright",         # street 가 밝음(흰색)
-             feature_channels=("chroma", "sat"),
-             pitch_x=204.5, pitch_y=204.5))
+    리포트에는 배경색 추정값, 웨이퍼 coverage, 채널별 pitch/위상/점수,
+    합의에 참여한 채널 수, 회전각 교차검증 결과가 들어간다.
 
-    print(dm.diagnostics.report())             # 자가진단 리포트
-    save_debug_overlay(dm, "debug.png")        # 디버그 오버레이 저장
-    run_color_robustness_test("wafer.png")     # 색상 변형 테스트 하네스
+(b) 디버그 오버레이 이미지 저장 -- 눈으로 확인
 
-CLI
----
-    python wafer_color_v6_claude.py Img/real_piper_top_p088.png --overlay out.png
-    python wafer_color_v6_claude.py Img/real_piper_top_p088.png --robustness out_dir
+    from wafer_color_v6_claude import save_debug_overlay
+
+    save_debug_overlay(dm, "debug.png",
+                       max_dim   = 2000,   # 긴 변을 이 크기로 축소
+                       draw_grid = True,   # 격자선
+                       draw_dies = True,   # die 사각형 (경계 die 는 다른 색)
+                       draw_panel= True)   # 좌상단 정보 패널
+
+    ※ 경로에 한글이 있으면 cv2.imwrite 가 실패하므로 내부에서
+      cv2.imencode + 파일 쓰기로 우회한다. 그냥 쓰면 된다.
+
+(c) 색상 변형 테스트 하네스 -- 같은 웨이퍼를 15가지로 물들여 재검출
+
+    from wafer_color_v6_claude import run_color_robustness_test
+
+    res = run_color_robustness_test(
+        "wafer.png",
+        variants    = None,   # None = 전부. 이름 리스트로 일부만 지정 가능
+        compare_v5  = True,   # 같은 폴더에 v5 있으면 함께 돌려 비교
+        pitch_tol   = 0.02,   # pitch 가 원본 대비 2% 안이면 통과
+        dies_tol    = 0.03,   # die 개수가 3% 안이면 통과
+        overlay_dir = "out",  # 변형별 오버레이도 저장
+    )
+
+    쓸 수 있는 variant 이름(15종, `COLOR_VARIANTS` 의 키):
+        original            원본 그대로 (기준값을 만든다)
+        invert              BGR 반전 -- street/die 명암이 뒤집힌다
+        gray                완전 무채색화 -- chroma/sat 채널이 죽는다
+        hue+60, hue+150     색상환 회전 -- a/b 축이 통째로 바뀐다
+        desat0.25           채도를 1/4 로
+        gamma0.5, gamma2.0  감마 -- 밝기 분포가 비선형으로 눌린다
+        lowcontrast         대비 축소
+        brightbg            배경만 밝게 -- 배경 자동추정을 흔든다
+        sepia               세피아 톤
+        cool_tint           푸른 톤
+        noise12             가우시안 노이즈 sigma=12
+        illum_grad          조명 기울기 -- detrend 가 버티는지 본다
+        white_street_brown  die 사이를 흰색+갈색 노이즈로 (V5 가 실패하는 케이스)
+    목록은 CLI 로도 볼 수 있다:  --list-variants
+
+    ※ 이 하네스는 "원본 자기 자신" 을 기준으로 한 **상대 비교** 다.
+      **절대 정답(ground truth)** 과 대조하려면 같은 폴더의
+      `make_color_wafers_claude.py` 를 쓴다. 29가지 팔레트의 웨이퍼를
+      pitch/중심/반지름/회전각/street 위상을 지정해 직접 합성하므로
+      검출값을 절대 기준과 비교할 수 있다.
+
+          python make_color_wafers_claude.py --out synth/ --eval --v5
+
+
+[6] 특정 좌표가 어느 die 인지 찾기
+---------------------------------
+    from wafer_color_v6_claude import locate_die_v6
+
+    info = locate_die_v6(dm, point=(1234, 567))            # 점으로 조회
+    info = locate_die_v6(dm, bbox=(1200, 540, 1300, 620))  # 사각형으로 조회
+                                                           # (bbox 는 중심점으로 환산)
+
+반환은 **dict 하나** 다. (겹치는 die 목록이 아니라, 질의 지점이 속한
+die 하나를 돌려준다)
+
+    info["die_index"]        # (ix, iy)   격자 인덱스   ★ "index" 아님
+    info["die_center_px"]    # (cx, cy)   die 중심 픽셀
+    info["die_rect_px"]      # (x0,y0,x1,y1) die 경계 사각형
+    info["crop_rect_px"]     # offset/margin 반영한 잘라낼 사각형
+    info["die_real_coord"]   # die 중심의 실좌표
+    info["real_coord"]       # 질의 지점의 실좌표
+    info["real_distance"]    # 웨이퍼 중심에서의 실거리
+    info["query_px"]         # 실제로 사용된 질의 픽셀 좌표
+    info["corner_px"]        # 질의 지점이 속한 die 의 좌상단
+    info["in_wafer"]         # 웨이퍼 원 안인가
+    info["is_edge_partial"] / ["is_edge_ring"] / ["is_edge"]
+    info["edge_mode"]        # 판정에 쓰인 edge_mode
+    info["input_type"]       # "point" | "bbox"
+    info["wafer_center_px"]  # 웨이퍼 중심
+
+    offset_x / offset_y / margin_x / margin_y 는 build_die_map_v6 와
+    같은 의미이며, 여기서 다시 주면 그 값으로 crop_rect_px 를 계산한다.
+
+
+[7] CLI
+-------
+    # 기본 -- 결과 요약 출력
+    python wafer_color_v6_claude.py wafer.png
+
+    # 자가진단 리포트 + JSON 저장 + 오버레이 저장
+    python wafer_color_v6_claude.py wafer.png --report \
+           --json result.json --overlay out_dir/
+
+    # 색상 변형 테스트 (V5 와 비교)
+    python wafer_color_v6_claude.py wafer.png --robustness
+    python wafer_color_v6_claude.py wafer.png --robustness --no-v5
+    python wafer_color_v6_claude.py wafer.png --robustness \
+           --variants whitestreet,invert,gray
+    python wafer_color_v6_claude.py --list-variants
+
+    # 파라미터 직접 지정
+    python wafer_color_v6_claude.py wafer.png \
+           --bg 255,255,255 \
+           --polarity bright \
+           --channels chroma,sat \
+           --pitch 204.5              # 또는 --pitch 204.5,198.0
+    python wafer_color_v6_claude.py wafer.png --min-pitch 20 --roi 0.5
+
+    # 기타
+    --ppu 32            pixel_per_unit
+    --edge-mode ring    edge 판정 기준 (circle|ring|both)
+    --no-align          회전 보정 끄기
+    --no-clean          웨이퍼 마스크 정리 끄기
+
+    ※ --overlay 는 파일이 아니라 **디렉터리** 를 받는다.
+      디렉터리를 positional 로 주면 그 안의 이미지를 전부 처리한다.
+
+    python wafer_color_v6_claude.py Img/ --report --overlay out/
+
+
+[8] 잘 안 될 때 -- 순서대로 해볼 것
+----------------------------------
+먼저 `--report` 를 찍어서 경고(warnings)를 확인한다. 실제로 나오는
+문구와 그에 대한 대처는 다음과 같다.
+
+  "wafer detection fallback: coverage~1 ..."
+      웨이퍼 마스크가 이미지 거의 전체를 덮었다.
+      = 배경색과 웨이퍼 색이 구분되지 않았다는 뜻.
+      -> --bg 로 배경색을 직접 지정한다.  예: --bg 255,255,255
+
+  "wafer detection fallback: coverage~0 (wafer not separable...)"
+      마스크가 거의 비었거나 die 단위로 산산조각 났다.
+      (내접원으로 대체됐으므로 wafer_r 을 믿으면 안 된다)
+      -> scribe lane 이 넓은 경우다. wafer_close_ksize 를 키운다.
+         ColorProfile(wafer_close_ksize=41)
+
+  "minEnclosingCircle inflated by rim noise ..."
+      웨이퍼 테두리 밖 노이즈가 원을 부풀렸다는 뜻이며,
+      이미 무게중심+면적반지름으로 자동 보정했다. 보통 무시해도 된다.
+
+  "[x] weak pitch agreement 0.xx" / "[x] weak phase consensus 0.xx"
+      채널들끼리 pitch 나 위상이 서로 다른 값을 말하고 있다.
+      = 자동 선택된 feature 채널이 이 팔레트에 안 맞는다.
+      -> --channels 로 직접 지정한다.
+           흰(무채) street  -> chroma,sat,maxmin
+           검은 street      -> L
+           색은 같고 질감만 -> stdL
+           색상 대비        -> a,b
+
+  "[x] all channels below min_channel_score=0.08"
+      어떤 채널에서도 주기성이 안 잡혔다.
+      -> --roi 0.8 로 ROI 를 넓히거나 --min-pitch 를 낮춘다.
+      -> 그래도 안 되면 --pitch 로 직접 준다.
+
+  pitch 가 정확히 2배 또는 절반으로 나온다
+      리포트의 pitch 옆 note 에 "x2 (r=...)" 또는 "/2 (r=...)" 가
+      붙는지 본다. 이는 자동 보정이 개입했다는 표시다.
+      -> 정답을 알면 --pitch 로 못 박는 것이 가장 확실하다.
+      -> --min-pitch 를 실제 pitch 의 70% 정도로 올리면 절반 오검출이
+         대부분 사라진다.
+
+  "angle cross-check disagreed ..."
+      격자 기반 각도와 2D FFT 각도가 서로 다르다. 회전이 크거나
+      격자가 약할 때 나온다.
+      -> ColorProfile(angle_search_deg=15) 로 탐색 범위를 넓힌다.
+      -> 회전 보정이 필요 없으면 --no-align.
+
+  "residual grid tilt +0.xxx deg"
+      회전 보정 후에도 격자가 살짝 기울어 있다. 값이 0.1도 미만이면
+      실무상 무시 가능하다.
+
+  "quadrant coverage unbalanced ..."
+      사분면별 die 수가 심하게 치우쳤다. 웨이퍼 중심이 잘못 잡혔거나
+      이미지가 잘려 있을 가능성.
+      -> 오버레이(save_debug_overlay)로 원 위치를 눈으로 확인한다.
+
+  "no dies produced — grid detection is almost certainly wrong"
+      격자는 나왔는데 die 가 하나도 안 만들어졌다. 위 경고들 중
+      선행 원인이 반드시 같이 찍혀 있다. 그쪽을 먼저 고친다.
+
+예외(RuntimeError)로 죽는 경우:
+
+  "Grid ROI too small — wafer detection likely failed."
+      웨이퍼 검출이 실패해 ROI 가 너무 작아졌다.
+      -> --bg 로 배경색을 지정한다.
+
+  "Implausible die size: WxH"
+      pitch 가 비상식적인 값으로 나왔다.
+      -> --min-pitch / --pitch 로 범위를 좁혀 준다.
 """
 
 from __future__ import annotations
@@ -2332,7 +2668,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
             "  python wafer_color_v6_claude.py Img/x.png --robustness --overlay out/\n"
             "  python wafer_color_v6_claude.py Img/x.png --pitch 128 --polarity bright\n"
         ))
-    ap.add_argument("images", nargs="+", help="이미지 파일 또는 디렉터리")
+    # nargs="*" 이어야 `--list-variants` 만 단독으로 쓸 수 있다.
+    # (이미지 필수 여부는 parse 후에 직접 검사한다)
+    ap.add_argument("images", nargs="*", help="이미지 파일 또는 디렉터리")
     ap.add_argument("--report", action="store_true", help="자가진단 리포트 출력")
     ap.add_argument("--json", metavar="PATH", help="진단 결과 JSON 저장")
     ap.add_argument("--overlay", metavar="DIR", help="디버그 오버레이 저장 디렉터리")
@@ -2363,6 +2701,9 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
         for k in COLOR_VARIANTS:
             print(f"  {k}")
         return 0
+
+    if not a.images:
+        ap.error("이미지 파일 또는 디렉터리를 하나 이상 지정하세요.")
 
     profile = _build_profile_from_args(a)
     build_kw: Dict[str, Any] = dict(

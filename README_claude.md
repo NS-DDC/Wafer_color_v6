@@ -13,6 +13,40 @@ print(dm.pitch_x, dm.pitch_y, dm.num_dies)
 print(dm.diagnostics.report())              # self-diagnosis
 ```
 
+### 📖 사용법은 소스 파일 맨 위 주석에 전부 들어 있습니다
+
+두 파일 모두 모듈 docstring 에 상세 사용법을 한국어로 달아두었습니다.
+에디터에서 파일을 열거나 `help()` 로 바로 볼 수 있습니다.
+
+```bash
+python -c "import wafer_color_v6_claude as m; print(m.__doc__)"
+python -c "import make_color_wafers_claude as g; print(g.__doc__)"
+```
+
+`wafer_color_v6_claude.py` 의 목차:
+
+| 절 | 내용 |
+|---|---|
+| [1] | 설치 |
+| [2] | 완전 자동 사용 — `dm.dies` dict 의 모든 키 설명 |
+| [3] | 파라미터 직접 지정 — `ColorProfile` 전 필드 + feature 채널 7종이 각각 어떤 상황에 반응하는지 |
+| [4] | `build_die_map_v6()` 인자 18개 + 반환 속성 전체 + V5 호환 좌표 규약 |
+| [5] | 검증 3종 — 자가진단 리포트 / 디버그 오버레이 / 색상 변형 하네스(variant 15종 각각의 의도) |
+| [6] | `locate_die_v6()` — 반환 dict 의 키 16개 |
+| [7] | CLI 전체 옵션과 예시 |
+| [8] | **잘 안 될 때** — 실제로 출력되는 경고 문구별 대처법 |
+
+`make_color_wafers_claude.py` 의 목차:
+
+| 절 | 내용 |
+|---|---|
+| [1] | 준비 |
+| [2] | CLI 전체 옵션 |
+| [3] | 결과 표 읽는 법 + 허용오차(TOL) 기준 |
+| [4] | 팔레트 29종이 각각 무엇을 노린 시험인지 |
+| [5] | `WaferSpec` 로 내 팔레트 추가하기 (전 필드 설명) |
+| [6] | 재현성 — seed 를 `zlib.crc32` 로 잡아야 하는 이유 |
+
 ---
 
 ## Headline result

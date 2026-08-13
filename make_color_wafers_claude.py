@@ -9,11 +9,161 @@
 pitch / 중심 / 반지름 / 회전각 / street 위상을 우리가 지정하므로
 검출 결과를 절대 기준과 대조할 수 있다.
 
-사용:
-    python make_color_wafers_claude.py --out synth/            # 생성만
-    python make_color_wafers_claude.py --out synth/ --eval     # 생성 + 검증
-    python make_color_wafers_claude.py --out synth/ --eval --v5 # V5 도 같이
-    python make_color_wafers_claude.py --list                  # 팔레트 목록
+====================================================================
+                          사 용 법  (USAGE)
+====================================================================
+
+[1] 준비
+--------
+    pip install numpy opencv-python
+
+    같은 폴더에 `wafer_color_v6_claude.py` 가 있어야 `--eval` 이 된다.
+    `--v5` 까지 쓰려면 `wafer_die_map_v5.py` 도 있어야 한다.
+
+
+[2] CLI -- 이것만 알면 된다
+--------------------------
+    # (a) 이미지만 생성 (29장)
+    python make_color_wafers_claude.py --out synth/
+
+    # (b) 생성 + V6 로 검출해서 정답과 대조
+    python make_color_wafers_claude.py --out synth/ --eval
+
+    # (c) V5 와 나란히 비교  ★ V6 의 존재 이유가 여기서 보인다
+    python make_color_wafers_claude.py --out synth/ --eval --v5
+
+    # (d) 실패한 케이스만 다시 파고들 때
+    python make_color_wafers_claude.py --out synth/ --eval \
+           --only 15_lowcontrast 22_large_pitch --overlay
+
+    # (e) 팔레트 이름 목록
+    python make_color_wafers_claude.py --list
+
+옵션 전체:
+    --out DIR      출력 디렉터리 (기본 synth/)
+    --eval         검출까지 수행해 정답과 대조
+    --v5           V5 도 같이 돌려 한 표에 비교
+    --overlay      팔레트별 검출 오버레이 PNG 저장 (<name>__v6.png)
+    --only A B ...  특정 팔레트만 (공백 구분, 이름 그대로)
+    --size N       캔버스 한 변을 N 으로 덮어쓰기 (빠른 실험용)
+    --json PATH    결과를 JSON 으로 저장
+    --list         팔레트 목록 출력 후 종료
+
+
+[3] 결과 표 읽는 법
+------------------
+    name              v6                      v5
+    01_classic_dark   OK  px+0.00% py+0.00%   FAIL  RuntimeError
+                      ^^                      ^^^^
+                      정답과 대조한 판정       V5 는 대개 예외로 죽는다
+
+    OK / FAIL 은 아래 허용오차(TOL) 를 모두 통과했는지로 정한다.
+
+        pitch  : 1.0%   (상대오차)
+        center : 15 px  (절대)
+        radius : 3.0%   (상대)
+        angle  : 0.50 deg
+        phase  : pitch 의 25% 이내 (street 위치, 원형 거리로 계산)
+
+    맨 아래 요약줄에 `v6 29/29 (100.0%)` 처럼 합계가 나온다.
+
+
+[4] 팔레트 29종 -- 무엇을 노린 시험인가
+--------------------------------------
+    01_classic_dark      검은 배경 / 어두운 street  (V5 가 상정한 조건)
+    02_classic_bright    밝은 die
+    03_bright_street     street 가 die 보다 밝음 -> 극성 자동판별 시험
+    04_white_street_brown 흰 street + 갈색 얼룩  ★사용자가 지목한 실패 케이스
+    05_grayscale         완전 무채색 -> chroma/sat 채널이 죽는다
+    06_isoluminant       밝기는 같고 색상만 다름 -> L 채널이 죽는다
+    07_isochromatic      색상은 같고 밝기만 다름
+    08_neon              고채도 원색
+    09_pastel            저채도 파스텔
+    10_sepia             세피아
+    11_green_pcb         PCB 녹색
+    12_copper            구리색
+    13_purple            보라
+    14_cyan_on_white     흰 바탕에 청록 die
+    15_lowcontrast       극저대비  ★pitch 2배 오검출이 나던 케이스
+    16_bright_bg         배경이 웨이퍼보다 밝음 -> 배경 자동추정 시험
+    17_rim_ring          웨이퍼 테두리 링 -> 원 반지름 부풀림 시험
+    18_rot_p3            +3.0도 회전
+    19_rot_m2            -2.2도 회전
+    20_aniso_pitch       가로/세로 pitch 가 다름
+    21_small_pitch       아주 작은 pitch
+    22_large_pitch       아주 큰 pitch + 넓은 lane  ★마스크 파편화 케이스
+    23_notch_left        notch 가 왼쪽
+    24_heavy_noise       강한 노이즈
+    25_jpeg_low          JPEG 저품질 압축
+    26_illum_strong      강한 조명 기울기
+    27_blur_soft         블러
+    28_speckle_die       die 위에 얼룩
+    29_worst_case        위 악조건을 한꺼번에
+
+    ※ 이름을 그대로 `--only` 에 넣으면 된다.
+
+
+[5] 파이썬에서 직접 쓰기 -- 내 팔레트 추가하기
+---------------------------------------------
+`WaferSpec` 에 적은 값이 **그대로 정답** 이 된다.
+
+    from make_color_wafers_claude import WaferSpec, synth_wafer
+    import cv2
+
+    spec = WaferSpec(
+        name    = "my_case",
+        size    = 1600,          # 정사각 캔버스 한 변
+        radius  = 700,           # 웨이퍼 반지름 (px)
+        cx=None, cy=None,        # None -> 캔버스 중앙
+        pitch_x = 64.0,          # 가로 pitch (px)
+        pitch_y = 64.0,
+        phase_x = 0.0,           # street 중심의 x 오프셋 (0..pitch_x)
+        phase_y = 0.0,
+        street_w= 6.0,           # street 폭 (px)
+        angle_deg = 0.0,         # 반시계 회전 (deg)
+        notch_deg = 270.0,       # notch 방향 (화면좌표, 아래=270)
+        notch_r   = 0.045,       # notch 반지름 / 웨이퍼 반지름
+
+        # 색 (모두 B,G,R 순서)
+        bg     = (255, 255, 255),  # 웨이퍼 바깥
+        die    = (60, 90, 160),    # die 바탕
+        street = (255, 255, 255),  # scribe lane
+        ink    = (30, 50, 110),    # die 내부 회로 무늬
+        rim    = None,             # 테두리 링 색 (None -> 없음)
+
+        # 열화
+        die_jitter  = 10.0,        # die 별 밝기 흔들림 (0 -> 완전 동일)
+        noise_sigma = 3.0,         # 가우시안 노이즈 sigma
+        speckle     = (40, 70, 110),  # 얼룩 색 (None -> 없음)
+        speckle_amt = 0.35,        # 얼룩 밀도 0..1
+        speckle_on  = "street",    # "street" | "die" | "all"
+        illum       = 0.0,         # 조명 기울기 0..1
+        blur        = 0.0,         # 가우시안 블러 sigma
+        jpeg_q      = 0,           # >0 이면 JPEG 왕복 압축
+        seed        = 1234,
+    )
+
+    img, truth = synth_wafer(spec)   # img: BGR ndarray, truth: 정답 dict
+    cv2.imwrite("my_case.png", img)
+    print(truth)                     # pitch/cx/cy/r/angle/phase ...
+
+    # 바로 검증까지
+    from make_color_wafers_claude import evaluate
+    from pathlib import Path
+    res = evaluate([spec], Path("synth/"), with_v5=False, save_overlay=True)
+
+`spec.truth()` 만 따로 불러도 정답 dict 를 얻을 수 있다.
+
+
+[6] 재현성 (중요)
+-----------------
+팔레트별 seed 는 `zlib.crc32(name)` 으로 만든다.
+파이썬 내장 `hash()` 는 PYTHONHASHSEED 때문에 **프로세스마다 값이
+달라져서** 같은 명령을 두 번 돌려도 다른 이미지가 나온다.
+그러면 "고쳤는데 왜 또 실패하지" 같은 유령 디버깅을 하게 된다.
+직접 팔레트를 추가할 때도 seed 는 반드시 고정값으로 준다.
+
+    확인:  md5sum synth/15_lowcontrast.png   # 두 번 돌려도 같아야 한다
 """
 from __future__ import annotations
 
