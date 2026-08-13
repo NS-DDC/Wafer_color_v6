@@ -27,3 +27,5 @@ python -c "from wafer_die_map_color_robust import build_die_map_robust; dm = bui
 
 The supplied source images are in `Img/`. Generated natural-colour examples
 are in `TestAssets/NaturalColorSeries/`.
+
+Angle verification is documented in [ANGLE_TESTING.md](ANGLE_TESTING.md).

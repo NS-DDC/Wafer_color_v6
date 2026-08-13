@@ -186,6 +186,9 @@ python test_color_variants.py
 
 # 자연스러운 street를 가진 AI 색상 시리즈 3종
 python test_natural_color_series.py
+
+# 실제/자연스러운 색상 wafer를 +/-0.5, 1, 2, 3도로 회전한 angle 보정 시험
+python test_angle_alignment.py
 ```
 
 테스트 원본 위치:
