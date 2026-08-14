@@ -52,8 +52,15 @@ def _line(image: np.ndarray, p1: tuple[int, int], p2: tuple[int, int],
     image[pixels] = cv2.addWeighted(image, 0.25, tint, 0.75, 0)[pixels]
 
 
-def _render(source: Path, config: ColorRobustConfig) -> tuple[np.ndarray, object, dict]:
+def _render(source: Path, config: ColorRobustConfig,
+            reference_label: str = "BLUE: nearest grid corner") -> tuple[np.ndarray, object, dict]:
     die_map, info = build_die_map_robust(source, config=config, return_info=True)
+    return _render_map(die_map, info, reference_label)
+
+
+def _render_map(die_map: object, info: dict,
+                reference_label: str = "BLUE: nearest grid corner") -> tuple[np.ndarray, object, dict]:
+    """Draw any already-built die map without changing the source image."""
     image = die_map.aligned_image.copy()
     height, width = image.shape[:2]
     wafer_mask = np.zeros((height, width), np.uint8)
@@ -74,7 +81,7 @@ def _render(source: Path, config: ColorRobustConfig) -> tuple[np.ndarray, object
     diamond = np.array([[x0, y0 - 12], [x0 + 12, y0], [x0, y0 + 12], [x0 - 12, y0]], np.int32)
     cv2.fillConvexPoly(image, diamond, (255, 90, 0), cv2.LINE_AA)
     cv2.polylines(image, [diamond], True, (255, 255, 255), 1, cv2.LINE_AA)
-    cv2.putText(image, "RED: wafer center | BLUE: nearest grid corner", (20, 32),
+    cv2.putText(image, f"RED: wafer center | {reference_label}", (20, 32),
                 cv2.FONT_HERSHEY_SIMPLEX, 0.62, (0, 235, 255), 2, cv2.LINE_AA)
     cv2.putText(image, f"pitch {die_map.pitch_x:.1f} x {die_map.pitch_y:.1f}px | {info['grid']['selected_method']}",
                 (20, 60), cv2.FONT_HERSHEY_SIMPLEX, 0.58, (0, 235, 255), 2, cv2.LINE_AA)

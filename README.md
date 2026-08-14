@@ -49,6 +49,24 @@ global rectangular lattice.
 python test_global_pitch_refinement.py
 ```
 
+## Real-camera X/Y reference profile
+
+For the supplied raw camera images only, use
+`wafer_die_map_real_axis.py`. It preserves the observed reference convention:
+X is the nearest vertical street to wafer centre, while Y is the horizontal
+street above wafer centre. This is intentionally separate from synthetic-test
+behaviour.
+
+```python
+from wafer_die_map_real_axis import build_die_map_real_axis
+
+dm = build_die_map_real_axis(r"E:\data\real_wafer.png")
+```
+
+Run `python test_real_axis_reference.py` for the raw `Img/` sources only, and
+`python make_real_axis_diagnostics.py` to write their labelled overlays into
+`TestAssets/AllDiagnostics/`.
+
 ## Quick start
 
 ```powershell
