@@ -91,23 +91,6 @@ def main() -> None:
     for group, source, config in _sources():
         result_name = f"{group}__{source.stem}__diagnostic.png"
         output = OUT_DIR / result_name
-        if output.exists():
-            # Regenerate the small metadata record, but preserve the existing
-            # full-resolution render on resumptions.
-            try:
-                die_map, info = build_die_map_robust(source, config=config, return_info=True)
-                manifest.append(
-                    f"| `{group}/{source.name}` | {info['grid']['selected_method']} | "
-                    f"{die_map.pitch_x:.1f} x {die_map.pitch_y:.1f} | "
-                    f"({die_map.wafer_cx}, {die_map.wafer_cy}) | "
-                    f"({die_map.x0}, {die_map.y0}) | [{result_name}]({result_name}) |"
-                )
-                print(f"INDEX {group}/{source.name}: existing result")
-                continue
-            except Exception as exc:
-                failures.append(f"{group}/{source.name}: {exc}")
-                print(f"FAIL {failures[-1]}")
-                continue
         try:
             rendered, die_map, info = _render(source, config)
             assert cv2.imwrite(str(output), rendered), output

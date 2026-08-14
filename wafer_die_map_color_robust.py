@@ -51,6 +51,10 @@ class ColorRobustConfig:
     phase_refine: bool = True
     phase_refine_search_px: int = 18
     phase_refine_max_shift_px: int = 14
+    global_pitch_refine: bool = True
+    global_pitch_refine_window_ratio: float = 0.30
+    global_pitch_refine_min_lines: int = 8
+    global_pitch_refine_max_delta_ratio: float = 0.035
     max_angle_deg: float = 12.0
     angle_min_line_length_ratio: float = 0.16
     clean: bool = True
@@ -193,6 +197,82 @@ def _periodic_line_alignment(response: np.ndarray, predicted_origin: int,
     return int(round(predicted_origin + best_shift)), float(best_shift), confidence
 
 
+def _fit_global_lattice_axis(response: np.ndarray, initial_origin: float,
+                             initial_pitch: float, min_lines: int,
+                             window_ratio: float, max_delta_ratio: float
+                             ) -> Tuple[float, float, Dict[str, float]]:
+    """Fit one lattice to all visible street centres, including fractional pitch.
+
+    Period estimation from autocorrelation intentionally starts at pixel
+    precision.  Drawing a full-wafer grid with that rounded period can create
+    a small but visible accumulated error at the rim.  Here, each predicted
+    street is locally re-centred in the invariant street response, then a
+    robust least-squares line fits ``position = origin + index * pitch``.
+    This corrects systematic drift while retaining the original candidate if
+    the observations are too sparse or disagree with it.
+    """
+    response = response.astype(np.float64)
+    pitch = float(initial_pitch)
+    if pitch <= 2.0 or response.size < 3:
+        return float(initial_origin), pitch, {"used": 0.0, "lines": 0.0, "rms_px": 0.0}
+
+    half_window = max(3, int(round(pitch * float(window_ratio))))
+    line_ids = np.arange(
+        int(np.ceil((-float(initial_origin) - half_window) / pitch)),
+        int(np.floor((response.size - 1 - float(initial_origin) + half_window) / pitch)) + 1,
+    )
+    observed: List[float] = []
+    observed_ids: List[float] = []
+    for line_id in line_ids:
+        predicted = float(initial_origin) + float(line_id) * pitch
+        lo = max(0, int(np.floor(predicted - half_window)))
+        hi = min(response.size, int(np.ceil(predicted + half_window + 1)))
+        if hi - lo < 3:
+            continue
+        segment = response[lo:hi]
+        peak = lo + int(np.argmax(segment))
+        # The box-integrated profile is a broad street-centre hill.  A small
+        # weighted centroid makes the fit subpixel without being drawn toward
+        # die-internal circuit texture elsewhere in the search interval.
+        radius = max(2, min(7, half_window // 3))
+        c_lo, c_hi = max(lo, peak - radius), min(hi, peak + radius + 1)
+        coords = np.arange(c_lo, c_hi, dtype=np.float64)
+        weights = response[c_lo:c_hi] - float(np.min(segment))
+        if float(weights.sum()) <= 1e-9:
+            position = float(peak)
+        else:
+            position = float(np.dot(coords, weights) / weights.sum())
+        observed.append(position)
+        observed_ids.append(float(line_id))
+
+    ids = np.asarray(observed_ids, dtype=np.float64)
+    positions = np.asarray(observed, dtype=np.float64)
+    if positions.size < max(3, int(min_lines)):
+        return float(initial_origin), pitch, {"used": 0.0, "lines": float(positions.size), "rms_px": 0.0}
+
+    keep = np.ones(positions.size, dtype=bool)
+    origin, fitted_pitch = float(initial_origin), pitch
+    for _ in range(4):
+        if int(keep.sum()) < max(3, int(min_lines)):
+            break
+        fitted_pitch, origin = np.polyfit(ids[keep], positions[keep], 1)
+        residual = positions - (origin + ids * fitted_pitch)
+        median = float(np.median(residual[keep]))
+        mad = float(np.median(np.abs(residual[keep] - median)))
+        tolerance = max(1.25, 3.5 * 1.4826 * mad)
+        next_keep = np.abs(residual - median) <= tolerance
+        if np.array_equal(next_keep, keep):
+            keep = next_keep
+            break
+        keep = next_keep
+
+    if int(keep.sum()) < max(3, int(min_lines)) or abs(fitted_pitch - pitch) > pitch * float(max_delta_ratio):
+        return float(initial_origin), pitch, {"used": 0.0, "lines": float(keep.sum()), "rms_px": 0.0}
+    residual = positions[keep] - (origin + ids[keep] * fitted_pitch)
+    rms = float(np.sqrt(np.mean(np.square(residual))))
+    return float(origin), float(fitted_pitch), {"used": 1.0, "lines": float(keep.sum()), "rms_px": rms}
+
+
 def _gradient_grid_candidate(image_bgr: np.ndarray, wafer_cx: int, wafer_cy: int,
                              wafer_r: int, config: ColorRobustConfig
                              ) -> Tuple[float, float, int, int, float, Dict[str, np.ndarray]]:
@@ -281,6 +361,29 @@ def detect_grid_color_robust(image_bgr: np.ndarray, wafer_cx: int, wafer_cy: int
                 break
     phase_info: Dict[str, float] = {"shift_x": 0.0, "shift_y": 0.0,
                                     "confidence_x": 0.0, "confidence_y": 0.0}
+    global_fit: Dict[str, Dict[str, float]] = {
+        "x": {"used": 0.0, "lines": 0.0, "rms_px": 0.0},
+        "y": {"used": 0.0, "lines": 0.0, "rms_px": 0.0},
+    }
+    if config.global_pitch_refine and phase_diag is not None:
+        # Only use a central wafer band: rim/edge energy is not a street and
+        # otherwise biases a projection near the ends of the lattice.
+        half = max(80, int(wafer_r * config.roi_ratio))
+        y1, y2 = max(0, wafer_cy - half), min(phase_diag["gx_centre"].shape[0], wafer_cy + half)
+        x1, x2 = max(0, wafer_cx - half), min(phase_diag["gy_centre"].shape[1], wafer_cx + half)
+        x0, px, global_fit_x = _fit_global_lattice_axis(
+            phase_diag["gx_centre"][y1:y2].mean(axis=0), x0, px,
+            config.global_pitch_refine_min_lines,
+            config.global_pitch_refine_window_ratio,
+            config.global_pitch_refine_max_delta_ratio,
+        )
+        y0, py, global_fit_y = _fit_global_lattice_axis(
+            phase_diag["gy_centre"][:, x1:x2].mean(axis=1), y0, py,
+            config.global_pitch_refine_min_lines,
+            config.global_pitch_refine_window_ratio,
+            config.global_pitch_refine_max_delta_ratio,
+        )
+        global_fit = {"x": global_fit_x, "y": global_fit_y}
     if config.phase_refine and phase_diag is not None:
         # Use full-image directional edge responses for a central geometry
         # anchor; the candidate's ROI was used only for pitch estimation.
@@ -299,6 +402,7 @@ def detect_grid_color_robust(image_bgr: np.ndarray, wafer_cx: int, wafer_cy: int
         "selected_method": name,
         "quality": float(score),
         "phase_refinement": phase_info,
+        "global_pitch_refinement": global_fit,
         "origin_mode": config.origin_mode,
         "origin_source": origin_source,
         "origin_delta_from_center_px": {"x": int(x0 - wafer_cx), "y": int(y0 - wafer_cy)},

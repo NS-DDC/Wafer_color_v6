@@ -34,6 +34,21 @@ dm = build_die_map_robust(
 The original `build_die_map`, `locate_die`, and `crop_die` APIs remain in the
 same file. Run `python test_single_file.py` to verify the standalone file.
 
+## Long-range grid-fit correction
+
+`build_die_map_robust()` first obtains a repeat period, then re-fits that
+lattice against every visible street in the central wafer region. This retains
+the fractional pitch (for example `92.18 px`) instead of drawing every die at
+a rounded `92 px`, preventing the overlay and die rectangles from drifting at
+the wafer rim. It is enabled by default with
+`ColorRobustConfig(global_pitch_refine=True)`. Set it to `False` only when a
+non-uniform/perspective image intentionally cannot be represented by one
+global rectangular lattice.
+
+```powershell
+python test_global_pitch_refinement.py
+```
+
 ## Quick start
 
 ```powershell
