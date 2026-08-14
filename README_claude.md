@@ -364,6 +364,54 @@ the grid lines.
 
 ---
 
+## Return format: same as v5
+
+`build_die_map_v6()` returns `WaferDieMapV6`, which is **v5's `WaferDieMap`
+format**, not a new one. It is a separate class only because v6 does not import
+v5 — being standalone was a requirement, so the dataclass had to be redeclared.
+The contents were copied field for field:
+
+| | |
+|---|---|
+| v5 fields present in v6 | **22 / 22**, same names and types |
+| positional order matches v5 | **yes** (`fields(v6)[:22] == fields(v5)`) |
+| die entry dict keys | **identical**, zero difference |
+| extra in v6 | `wafer_mask`, `diagnostics` — appended at the end |
+
+So v5's downstream helpers accept a v6 object directly, no conversion:
+
+```python
+import wafer_die_map_v5 as v5
+from wafer_color_v6_claude import build_die_map_v6
+
+m = build_die_map_v6("wafer.png")
+v5.locate_die(m, point=(1600, 1600))
+# -> same 16 keys as v5, same die_index (0, -1)
+```
+
+If you need a real `v5.WaferDieMap` instance (for `isinstance` checks or
+pickling), either conversion works:
+
+```python
+v5_obj = v5.WaferDieMap(**m.to_v5_kwargs())      # keyword
+v5_obj = v5.WaferDieMap(*dc.astuple(m)[:22])     # positional
+```
+
+The two extra fields are additions, not replacements:
+
+- **`wafer_mask`** — the colour-adaptive wafer foreground mask (`uint8` 0/255).
+  v5 rebuilt an equivalent from a brightness threshold every time it needed one;
+  v6 hands over the one it already computed.
+- **`diagnostics`** — the self-diagnosis report (per-channel scores, agreement,
+  warnings). `print(m.diagnostics.report())` for the human-readable form.
+
+Both were moved to the **end** of the field list in this pass. `wafer_mask` had
+been sitting in the middle, which broke positional conversion while leaving
+attribute access fine — the kind of mismatch that shows up only once someone
+tries tuple unpacking.
+
+---
+
 ## CLI
 
 ```bash

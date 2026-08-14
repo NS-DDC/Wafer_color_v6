@@ -411,7 +411,7 @@ import os
 import sys
 import time
 import traceback
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, fields as dataclasses_fields
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -811,7 +811,35 @@ class GridDiagnostics:
 
 @dataclass
 class WaferDieMapV6:
-    """build_die_map_v6() 결과. V5 의 WaferDieMap 과 필드 호환 + diagnostics 추가."""
+    """build_die_map_v6() 결과 = **V5 WaferDieMap 과 같은 형식** + 부가 필드 2개.
+
+    별도 클래스인 이유는 형식이 달라서가 아니라, v6 가 v5 를 import 하지 않는
+    독립 모듈이라 dataclass 를 다시 선언할 수밖에 없기 때문이다. 내용은
+    v5 의 22개 필드를 **이름/타입/순서 그대로** 복사한 뒤 뒤에 2개만 덧붙였다.
+
+    따라서 v5 의 후처리 함수를 그대로 쓸 수 있다 (실측 확인):
+
+        import wafer_die_map_v5 as v5
+        m = build_die_map_v6("wafer.png")
+        v5.locate_die(m, point=(1600, 1600))   # 그대로 동작
+
+    dies / dies_by_index 안의 die entry dict 도 v5 와 키·타입이 완전히 같다
+    (index, center_px, rect_px, crop_rect_px, real_coord,
+     is_edge_partial, is_edge_ring, is_edge, image).
+
+    앞 22개는 v5 와 위치까지 같으므로 위치 인자 변환도 성립한다::
+
+        import dataclasses as dc
+        v5_obj = v5.WaferDieMap(*dc.astuple(m)[:22])
+
+    v6 추가 필드 (v5 에 없음, 맨 뒤라 위치 호환을 깨지 않는다)
+    ------------------------------------------------------
+    wafer_mask   : 색상 적응형으로 구한 웨이퍼 전경 마스크 (uint8 0/255).
+                   v5 는 밝기 임계값으로 매번 다시 만들었지만 v6 는
+                   이미 구한 것을 그대로 넘겨준다.
+    diagnostics  : 자가진단 리포트 (채널별 점수/합의도/경고).
+                   ``print(m.diagnostics.report())`` 로 사람이 읽는 형태 출력.
+    """
     wafer_cx: int
     wafer_cy: int
     wafer_r: int
@@ -827,7 +855,6 @@ class WaferDieMapV6:
     image_shape: Tuple[int, int] = (0, 0)
     rotation_deg: float = 0.0
     aligned_image: Optional[np.ndarray] = field(default=None, repr=False)
-    wafer_mask: Optional[np.ndarray] = field(default=None, repr=False)
     notch_center_px: Optional[Tuple[int, int]] = None
     die_grid_angle_resid: float = 0.0
     angle_verified: bool = False
@@ -835,6 +862,10 @@ class WaferDieMapV6:
     edge_mode: str = DEFAULT_EDGE_MODE
     angle_confidence: float = 1.0
     angle_agree: bool = True
+    # --- 여기까지가 V5 WaferDieMap 과 1:1 (이름/타입/순서) -------------------
+    # 아래 2개는 v6 전용. 반드시 맨 뒤에 둬라 — 중간에 끼우면 위치 인자
+    # 호환(dc.astuple(m)[:22])이 깨진다.
+    wafer_mask: Optional[np.ndarray] = field(default=None, repr=False)
     diagnostics: GridDiagnostics = field(default_factory=GridDiagnostics)
 
     def get_die(self, ix: int, iy: int) -> Optional[Dict[str, Any]]:
@@ -843,6 +874,21 @@ class WaferDieMapV6:
     @property
     def num_dies(self) -> int:
         return len(self.dies)
+
+    def to_v5_kwargs(self) -> Dict[str, Any]:
+        """v5 WaferDieMap 생성자에 그대로 넣을 수 있는 dict 반환.
+
+        v6 전용 필드(wafer_mask, diagnostics)만 빼고 전부 넘긴다::
+
+            import wafer_die_map_v5 as v5
+            v5_obj = v5.WaferDieMap(**m.to_v5_kwargs())
+
+        v5 를 import 하고 싶지 않다면 이 메서드를 쓸 필요가 없다.
+        v5 함수들은 v6 객체를 직접 받아도 동작한다 (덕 타이핑).
+        """
+        drop = {"wafer_mask", "diagnostics"}
+        return {f.name: getattr(self, f.name)
+                for f in dataclasses_fields(self) if f.name not in drop}
 
 
 # =============================================================================
