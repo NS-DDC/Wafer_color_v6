@@ -1,0 +1,25 @@
+# real_exposed_top_p078
+self-check vs build_die_map_v6(): MATCH  viz=(1526, 1543)  build=(1526, 1543)
+rotation applied = -0.8467 deg
+wafer center = (1536, 1536)   r = 1401
+ROI          = 1738x1738 @(667,667)   downscale=1.0000
+
+axis     pitch  agree  street_ph   conf     k     origin  off(pitch)
+x      78.0020   1.00    43.5727   0.67    19   1525.610     -0.1332
+y      78.0020   1.00    60.7577   0.21    19   1542.797     +0.0871
+
+channels (score / pitch_px / used):
+  [x] L       score=0.997 pitch=   78.00 USED  
+  [x] a       score=0.500 pitch=   78.00 USED  suspicious width 0.01
+  [x] b       score=0.055 pitch=   11.14 -     
+  [x] chroma  score=0.500 pitch=   78.01 USED  suspicious width 0.01
+  [x] sat     score=0.500 pitch=   78.01 USED  suspicious width 0.01
+  [x] maxmin  score=0.500 pitch=   78.01 USED  suspicious width 0.01
+  [x] stdL    score=0.994 pitch=   77.99 USED  
+  [y] L       score=0.996 pitch=   78.01 USED  
+  [y] a       score=0.500 pitch=   78.00 USED  suspicious width 0.01
+  [y] b       score=0.500 pitch=   78.01 USED  suspicious width 0.01
+  [y] chroma  score=0.500 pitch=   78.00 USED  x2 (r=+0.12->+1.00) suspicious width 0.01
+  [y] sat     score=0.500 pitch=   78.00 USED  suspicious width 0.01
+  [y] maxmin  score=0.500 pitch=   78.00 USED  suspicious width 0.01
+  [y] stdL    score=0.998 pitch=   78.00 USED  

@@ -285,7 +285,9 @@ die 하나를 돌려준다)
     info["real_coord"]       # 질의 지점의 실좌표
     info["real_distance"]    # 웨이퍼 중심에서의 실거리
     info["query_px"]         # 실제로 사용된 질의 픽셀 좌표
-    info["corner_px"]        # 질의 지점이 속한 die 의 좌상단
+    info["corner_px"]        # 격자 원점 (x0, y0) — die 좌상단이 **아니다**
+                             #   웨이퍼 중심에 가장 가까운 street 교차점이며
+                             #   질의 지점과 무관하게 항상 같은 값. (v5 와 동일)
     info["in_wafer"]         # 웨이퍼 원 안인가
     info["is_edge_partial"] / ["is_edge_ring"] / ["is_edge"]
     info["edge_mode"]        # 판정에 쓰인 edge_mode
@@ -1581,10 +1583,14 @@ def detect_grid_adaptive(img_bgr: np.ndarray,
                          ) -> Tuple[float, float, int, int]:
     """색에 의존하지 않는 die 격자 검출 -> (pitch_x, pitch_y, x0, y0).
 
-    x0, y0 는 V5 와 **동일한 규약**:
+    x0, y0 는 V5 와 **동일한 규약** — 두 축 모두 "가장 가까운" 이다:
       x0 = wafer 중심에 가장 가까운 세로 street 중심
-      y0 = wafer 중심보다 위(작거나 같은 y)에 있는 가장 가까운 가로 street 중심
+      y0 = wafer 중심에 가장 가까운 가로 street 중심
       die 중심 = (x0 + ix*px + px/2,  y0 - iy*py - py/2)
+
+    "가장 가까운" 이므로 원점은 중심에서 최대 ±0.5 pitch 안에 들어온다.
+    (예전 docstring 은 y 를 "중심보다 위" 라고 적었는데, 그건 제거된
+     math.floor 구현을 설명한 것이었다. 근거는 아래 origin 결정부 주석 참조.)
     """
     cfg = profile or ColorProfile()
     img_bgr = _load_bgr(img_bgr)          # 단독 호출 대비 입력 정규화

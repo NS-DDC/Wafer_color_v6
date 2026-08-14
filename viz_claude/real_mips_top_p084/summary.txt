@@ -1,0 +1,25 @@
+# real_mips_top_p084
+self-check vs build_die_map_v6(): MATCH  viz=(1537, 1537)  build=(1537, 1537)
+rotation applied = +1.2519 deg
+wafer center = (1535, 1536)   r = 1400
+ROI          = 1736x1736 @(667,668)   downscale=1.0000
+
+axis     pitch  agree  street_ph   conf     k     origin  off(pitch)
+x      83.9990   0.95    25.4872   0.90    18   1537.469     +0.0294
+y      84.0019   0.98    24.5174   1.00    18   1536.552     +0.0066
+
+channels (score / pitch_px / used):
+  [x] L       score=0.996 pitch=   84.00 USED  
+  [x] a       score=0.500 pitch=   84.00 USED  suspicious width 0.01
+  [x] b       score=0.132 pitch=    9.33 -     
+  [x] chroma  score=0.999 pitch=   84.00 USED  x2 (r=-0.14->+1.00)
+  [x] sat     score=0.999 pitch=   84.00 USED  
+  [x] maxmin  score=0.086 pitch=   10.50 -     
+  [x] stdL    score=0.995 pitch=   84.00 USED  
+  [y] L       score=0.999 pitch=   84.00 USED  
+  [y] a       score=0.500 pitch=   84.00 USED  x3 (r=+0.16->+1.00) suspicious width 0.01
+  [y] b       score=1.000 pitch=   84.00 USED  
+  [y] chroma  score=0.046 pitch=   14.00 -     
+  [y] sat     score=0.998 pitch=   84.00 USED  
+  [y] maxmin  score=0.098 pitch=   14.00 -     
+  [y] stdL    score=0.999 pitch=   84.00 USED  

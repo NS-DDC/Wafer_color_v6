@@ -1,0 +1,25 @@
+# portable_bw_sample
+self-check vs build_die_map_v6(): MATCH  viz=(1533, 1482)  build=(1533, 1482)
+rotation applied = +1.0992 deg
+wafer center = (1493, 1524)   r = 1393
+ROI          = 1728x1728 @(629,660)   downscale=1.0000
+
+axis     pitch  agree  street_ph   conf     k     origin  off(pitch)
+x      89.8050   1.00     6.7770   0.99    17   1533.463     +0.4506
+y      90.0814   1.00    40.3401   0.47    16   1481.642     -0.4702
+
+channels (score / pitch_px / used):
+  [x] L       score=0.997 pitch=   89.77 USED  x2 (r=-0.11->+1.00)
+  [x] a       score=0.000 pitch=    0.00 -     no periodic peak
+  [x] b       score=0.000 pitch=    0.00 -     no periodic peak
+  [x] chroma  score=0.000 pitch=    0.00 -     no periodic peak
+  [x] sat     score=0.000 pitch=    0.00 -     no periodic peak
+  [x] maxmin  score=0.000 pitch=    0.00 -     no periodic peak
+  [x] stdL    score=0.989 pitch=   89.84 USED  x2 (r=+0.55->+0.99)
+  [y] L       score=0.996 pitch=   90.01 USED  
+  [y] a       score=0.000 pitch=    0.00 -     no periodic peak
+  [y] b       score=0.000 pitch=    0.00 -     no periodic peak
+  [y] chroma  score=0.000 pitch=    0.00 -     no periodic peak
+  [y] sat     score=0.000 pitch=    0.00 -     no periodic peak
+  [y] maxmin  score=0.000 pitch=    0.00 -     no periodic peak
+  [y] stdL    score=0.990 pitch=   90.15 USED  

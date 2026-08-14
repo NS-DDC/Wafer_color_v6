@@ -1,0 +1,25 @@
+# natural_teal_bluegray
+self-check vs build_die_map_v6(): MATCH  viz=(622, 624)  build=(622, 624)
+rotation applied = +0.0000 deg
+wafer center = (627, 623)   r = 613
+ROI          = 760x760 @(247,243)   downscale=1.0000
+
+axis     pitch  agree  street_ph   conf     k     origin  off(pitch)
+x      37.7095   1.00    18.7332   1.00    16    622.086     -0.1303
+y      27.5748   1.00    17.8001   0.99    22    624.445     +0.0524
+
+channels (score / pitch_px / used):
+  [x] L       score=0.892 pitch=   37.71 USED  
+  [x] a       score=0.867 pitch=   37.69 USED  
+  [x] b       score=0.845 pitch=   37.62 USED  
+  [x] chroma  score=0.899 pitch=   37.74 USED  
+  [x] sat     score=0.673 pitch=   37.85 USED  
+  [x] maxmin  score=0.893 pitch=   37.73 USED  
+  [x] stdL    score=0.943 pitch=   37.66 USED  
+  [y] L       score=0.935 pitch=   27.57 USED  
+  [y] a       score=0.932 pitch=   27.58 USED  
+  [y] b       score=0.921 pitch=   27.56 USED  
+  [y] chroma  score=0.943 pitch=   27.58 USED  
+  [y] sat     score=0.873 pitch=   27.59 USED  
+  [y] maxmin  score=0.942 pitch=   27.58 USED  
+  [y] stdL    score=0.963 pitch=   27.57 USED  

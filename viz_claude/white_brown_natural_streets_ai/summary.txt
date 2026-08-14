@@ -1,0 +1,25 @@
+# white_brown_natural_streets_ai
+self-check vs build_die_map_v6(): MATCH  viz=(633, 633)  build=(633, 633)
+rotation applied = +0.3723 deg
+wafer center = (630, 630)   r = 588
+ROI          = 730x730 @(265,265)   downscale=1.0000
+
+axis     pitch  agree  street_ph   conf     k     origin  off(pitch)
+x      35.1087   1.00     1.2678   1.00    18    633.224     +0.0918
+y      35.7429   0.75    25.7537   0.99    17    633.384     +0.0947
+
+channels (score / pitch_px / used):
+  [x] L       score=0.925 pitch=   35.08 USED  
+  [x] a       score=0.787 pitch=   35.10 USED  
+  [x] b       score=0.934 pitch=   35.13 USED  
+  [x] chroma  score=0.931 pitch=   35.12 USED  
+  [x] sat     score=0.844 pitch=   35.16 USED  
+  [x] maxmin  score=0.933 pitch=   35.12 USED  
+  [x] stdL    score=0.967 pitch=   35.06 USED  
+  [y] L       score=0.925 pitch=   35.72 USED  
+  [y] a       score=0.764 pitch=   17.83 -     
+  [y] b       score=0.888 pitch=   35.78 USED  x2 (r=+0.58->+0.93)
+  [y] chroma  score=0.893 pitch=   35.78 USED  x2 (r=+0.64->+0.93)
+  [y] sat     score=0.745 pitch=   17.83 -     
+  [y] maxmin  score=0.895 pitch=   35.79 USED  x2 (r=+0.65->+0.94)
+  [y] stdL    score=0.983 pitch=   35.66 USED  

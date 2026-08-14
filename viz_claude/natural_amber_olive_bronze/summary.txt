@@ -1,0 +1,25 @@
+# natural_amber_olive_bronze
+self-check vs build_die_map_v6(): MATCH  viz=(622, 625)  build=(622, 625)
+rotation applied = +0.0000 deg
+wafer center = (626, 623)   r = 613
+ROI          = 760x760 @(246,243)   downscale=1.0000
+
+axis     pitch  agree  street_ph   conf     k     origin  off(pitch)
+x      37.7030   1.00    19.0290   1.00    16    622.277     -0.0988
+y      27.6063   1.00    17.1649   0.99    22    624.503     +0.0544
+
+channels (score / pitch_px / used):
+  [x] L       score=0.903 pitch=   37.69 USED  
+  [x] a       score=0.007 pitch=   54.29 -     
+  [x] b       score=0.904 pitch=   37.72 USED  
+  [x] chroma  score=0.908 pitch=   37.72 USED  
+  [x] sat     score=0.631 pitch=   37.76 USED  
+  [x] maxmin  score=0.905 pitch=   37.72 USED  
+  [x] stdL    score=0.953 pitch=   37.63 USED  
+  [y] L       score=0.928 pitch=   27.54 USED  
+  [y] a       score=0.848 pitch=   27.67 USED  
+  [y] b       score=0.928 pitch=   27.56 USED  
+  [y] chroma  score=0.930 pitch=   27.55 USED  
+  [y] sat     score=0.490 pitch=   28.04 USED  
+  [y] maxmin  score=0.932 pitch=   27.55 USED  
+  [y] stdL    score=0.956 pitch=   27.55 USED  

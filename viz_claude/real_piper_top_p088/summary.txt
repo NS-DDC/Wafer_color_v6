@@ -1,0 +1,25 @@
+# real_piper_top_p088
+self-check vs build_die_map_v6(): MATCH  viz=(1559, 1532)  build=(1559, 1532)
+rotation applied = -1.5485 deg
+wafer center = (1536, 1536)   r = 1401
+ROI          = 1738x1738 @(667,667)   downscale=1.0000
+
+axis     pitch  agree  street_ph   conf     k     origin  off(pitch)
+x      87.9773   1.00    63.4235   0.41    17   1559.037     +0.2618
+y      88.0002   1.00    35.5922   0.81    17   1531.595     -0.0501
+
+channels (score / pitch_px / used):
+  [x] L       score=0.999 pitch=   87.89 USED  x2 (r=-0.23->+1.00)
+  [x] a       score=0.500 pitch=   88.00 USED  suspicious width 0.01
+  [x] b       score=1.000 pitch=   88.00 USED  
+  [x] chroma  score=1.000 pitch=   88.01 USED  x3 (r=-0.05->+1.00)
+  [x] sat     score=1.000 pitch=   88.00 USED  x3 (r=-0.01->+1.00)
+  [x] maxmin  score=1.000 pitch=   88.00 USED  
+  [x] stdL    score=0.997 pitch=   87.96 USED  x2 (r=+0.54->+1.00)
+  [y] L       score=0.998 pitch=   88.01 USED  
+  [y] a       score=0.999 pitch=   88.00 USED  
+  [y] b       score=1.000 pitch=   88.00 USED  
+  [y] chroma  score=0.999 pitch=   88.00 USED  
+  [y] sat     score=1.000 pitch=   88.00 USED  
+  [y] maxmin  score=1.000 pitch=   88.00 USED  
+  [y] stdL    score=0.998 pitch=   87.99 USED  

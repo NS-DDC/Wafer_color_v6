@@ -451,6 +451,70 @@ dm = build_die_map_v6("wafer.png", profile=ColorProfile(
 ))
 ```
 
+## Where the grid origin comes from — visual walkthrough
+
+To answer "which part do I edit to move the magenta X", three artefacts:
+
+| | what | where |
+|---|---|---|
+| Stage images | 6 panels per image, 9 images | [`viz_claude/`](viz_claude/) |
+| Code flow map | call tree with line numbers, modification catalogue | [`docs/ORIGIN_PIPELINE_claude.md`](docs/ORIGIN_PIPELINE_claude.md) |
+| Sensitivity table | 41 parameter variants × 9 images, measured | [`docs/ORIGIN_SENSITIVITY_claude.md`](docs/ORIGIN_SENSITIVITY_claude.md) |
+
+```bash
+python viz_origin_claude.py Img/real_casio_top_p092.png --out viz_out
+python sweep_origin_claude.py Img/*.png --md docs/ORIGIN_SENSITIVITY_claude.md
+```
+
+The whole origin decision is three lines:
+
+```python
+# wafer_color_v6_claude.py:1679-1681
+anchor = wafer_cx if axis == "x" else wafer_cy
+k      = round((anchor - street_ph) / pitch)
+origin = street_ph + k * pitch
+```
+
+Everything upstream exists to produce `pitch` and `street_ph` without knowing
+the wafer's colors.
+
+`viz_origin_claude.py` rebuilds the pipeline by calling v6 internals directly, so
+it carries a permanent self-check against `build_die_map_v6()`. This is not
+decoration — during development the rotation-alignment step was omitted and the
+origin came out `(1549,1535)` instead of `(1533,1539)`; the check caught it.
+**All 9 images currently report `MATCH`.**
+
+### What actually moves the origin
+
+Measured, not guessed. Priority `pitch` > `shift` > `drift`, because if the pitch
+itself changes then the origin landing on the same coordinate is a coincidence —
+it is a different grid.
+
+| parameter | pitch | shift | drift |
+|---|---|---|---|
+| `min_pitch_px=32.0` | **3/9** | 0/9 | 0/9 |
+| `feature_channels=("a",)` | **2/9** | 0/9 | 2/9 |
+| `feature_channels=("b",)` | **2/9** | 0/9 | 0/9 |
+| `feature_channels=("sat",)` | **2/9** | 0/9 | 2/9 |
+| `street_polarity` forced | 0/9 | 1/9 | **4/9** |
+| `align_angle=False` | 0/9 | 1/9 | 2/9 |
+
+27 of 41 variants were stable on all 9 images — including the entire ranges of
+`roi_ratio`, `max_pitch_ratio`, `pitch_cluster_tol`, and the angle iteration
+settings. **ROI and consensus tuning barely touches the origin.** The risk is
+concentrated in three places: excluding the true pitch from the FFT search band,
+forcing `street_polarity`, and running on a single channel.
+
+`min_pitch_px=32` broke exactly the three NCS images whose true y-pitch is 27.6 px.
+With the true period cut out of the band, the FFT returned an integer multiple
+(7×, 7×, 3×). This is structural, not a tuning accident — the lower bound must
+stay below the true pitch.
+
+The 7-channel consensus is the actual defence. Single channels break on 1–2
+images each; the 7-channel vote passed all 9.
+
+---
+
 ## Known limitations
 
 - Angle projection vs FFT disagree on `portable_bw_sample` and `portable_bw_overlay`
