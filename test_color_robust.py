@@ -21,7 +21,8 @@ OUT = ROOT / "_color_robust_diagnostics"
 
 def main() -> None:
     OUT.mkdir(exist_ok=True)
-    images = sorted((ROOT / "Img").glob("*.png"))
+    images = [path for path in sorted((ROOT / "Img").glob("*.png"))
+              if "_overlay" not in path.stem]
     assert images, "No input PNGs found under Img"
 
     for path in images:

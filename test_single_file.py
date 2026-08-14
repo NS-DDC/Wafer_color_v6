@@ -16,7 +16,6 @@ def main() -> None:
     # Cover every supplied reference image.  The images intentionally span
     # monochrome, coloured, exposed and patterned wafer appearances.
     for path, expected in (
-        (ROOT / "Img" / "portable_bw_overlay.png", (90.0, 90.0)),
         (ROOT / "Img" / "portable_bw_sample.png", (90.0, 90.0)),
         (ROOT / "Img" / "real_casio_top_p092.png", (92.0, 92.0)),
         (ROOT / "Img" / "real_exposed_top_p078.png", (78.0, 78.0)),

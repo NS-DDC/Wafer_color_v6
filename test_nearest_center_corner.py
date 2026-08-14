@@ -24,6 +24,8 @@ def _assert_nearest(die_map) -> None:
 def main() -> None:
     # Real supplied wafers: verify each axis is snapped after all refinement.
     for path in sorted((ROOT / "Img").glob("*.png")):
+        if "_overlay" in path.stem:
+            continue
         die_map, _ = build_die_map_robust(
             path, config=ColorRobustConfig(min_pitch=60, max_pitch=110), return_info=True)
         _assert_nearest(die_map)

@@ -25,6 +25,8 @@ def _sources() -> Iterable[tuple[str, Path, ColorRobustConfig]]:
     # in each source image's native pixel system.
     base = ColorRobustConfig(min_pitch=25, max_pitch=160, angle_align="none")
     for path in sorted((ROOT / "Img").glob("*.png")):
+        if "_overlay" in path.stem:
+            continue
         # Match the real-image regression bounds: a wide unconstrained search
         # can choose a repeated feature inside a die as a false half-pitch.
         yield "img", path, ColorRobustConfig(min_pitch=60, max_pitch=110)

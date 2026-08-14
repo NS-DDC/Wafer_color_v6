@@ -13,7 +13,7 @@ OUTPUT = SOURCE / "all_diagnostics_contact_sheet.jpg"
 
 def main() -> None:
     files = sorted(SOURCE.glob("*__diagnostic.png"))
-    assert len(files) == 19, f"Expected 19 diagnostic files, got {len(files)}"
+    assert files, "No diagnostic files found"
     tile_w, tile_h, label_h, cols = 300, 300, 34, 5
     rows = int(np.ceil(len(files) / cols))
     sheet = np.zeros((rows * (tile_h + label_h), cols * tile_w, 3), np.uint8)

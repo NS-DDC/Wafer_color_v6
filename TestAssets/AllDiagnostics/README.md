@@ -4,7 +4,6 @@ Yellow: detected grid; red: wafer centre; blue: nearest grid reference corner.
 
 | Source | Method | Pitch (px) | Centre | Nearest corner | Result |
 | --- | --- | --- | --- | --- | --- |
-| `img/portable_bw_overlay.png` | std | 90.0 x 90.0 | (1498, 1506) | (1531, 1498) | [img__portable_bw_overlay__diagnostic.png](img__portable_bw_overlay__diagnostic.png) |
 | `img/portable_bw_sample.png` | std | 90.0 x 90.0 | (1501, 1503) | (1535, 1499) | [img__portable_bw_sample__diagnostic.png](img__portable_bw_sample__diagnostic.png) |
 | `img/real_casio_top_p092.png` | gradient | 92.0 x 92.0 | (1536, 1536) | (1536, 1541) | [img__real_casio_top_p092__diagnostic.png](img__real_casio_top_p092__diagnostic.png) |
 | `img/real_exposed_top_p078.png` | gradient | 78.0 x 78.0 | (1536, 1536) | (1532, 1536) | [img__real_exposed_top_p078__diagnostic.png](img__real_exposed_top_p078__diagnostic.png) |
