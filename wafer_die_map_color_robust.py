@@ -66,6 +66,27 @@ class ColorRobustConfig:
     """
 
 
+def _snap_origin_to_mode(x0: float, y0: float, pitch_x: float, pitch_y: float,
+                         wafer_cx: int, wafer_cy: int,
+                         origin_mode: Literal["nearest_center", "upper_right"]
+                         ) -> Tuple[int, int]:
+    """Choose a lattice crossing relative to wafer centre after all refinement.
+
+    Refinement can move a valid grid phase across a half-pitch boundary.  The
+    grid itself is unchanged, but its *representative* ``(x0, y0)`` must be
+    reselected after that move.  This prevents the Y coordinate from silently
+    remaining on the street above centre when the requested convention is the
+    closest intersection.
+    """
+    x = float(x0) + round((wafer_cx - float(x0)) / float(pitch_x)) * float(pitch_x)
+    if origin_mode == "nearest_center":
+        y_step = round((wafer_cy - float(y0)) / float(pitch_y))
+    else:
+        y_step = np.floor((wafer_cy - float(y0)) / float(pitch_y))
+    y = float(y0) + y_step * float(pitch_y)
+    return int(round(x)), int(round(y))
+
+
 def _normalize01(values: np.ndarray) -> np.ndarray:
     """Robustly map an image response to [0, 1] without outlier domination."""
     lo, hi = np.percentile(values, (5.0, 98.0))
@@ -123,6 +144,19 @@ def _candidate_quality(profile: np.ndarray, pitch: float, phase: float) -> float
     return contrast / noise
 
 
+def _street_centre_response(edge_profile: np.ndarray, pitch: float) -> np.ndarray:
+    """Convert paired street-edge energy into a response at street centres.
+
+    An absolute Sobel response has two maxima for a street: one at each edge.
+    A short box integration joins the pair so its maximum is their midpoint.
+    The width is deliberately a modest fraction of pitch and works for both
+    narrow saw streets and noisier/wider scribe lanes.
+    """
+    width = int(np.clip(round(float(pitch) * 0.12), 5, 15))
+    kernel = np.ones(width, dtype=np.float64)
+    return np.convolve(edge_profile.astype(np.float64), kernel, mode="same")
+
+
 def _periodic_line_alignment(response: np.ndarray, predicted_origin: int,
                               pitch: float, center: int, search_px: int,
                               max_shift_px: int) -> Tuple[int, float, float]:
@@ -170,18 +204,21 @@ def _gradient_grid_candidate(image_bgr: np.ndarray, wafer_cx: int, wafer_cy: int
     row = _smooth(gy[y1:y2, x1:x2].mean(axis=1), config.projection_smooth)
     px = float(v5._autocorr_period(col, min_lag=config.min_pitch, max_lag=config.max_pitch))
     py = float(v5._autocorr_period(row, min_lag=config.min_pitch, max_lag=config.max_pitch))
-    phx, phy = _periodic_phase(col, px), _periodic_phase(row, py)
+    col_centre = _street_centre_response(col, px)
+    row_centre = _street_centre_response(row, py)
+    phx, phy = _periodic_phase(col_centre, px), _periodic_phase(row_centre, py)
 
     # The default is the actual closest grid intersection to wafer centre.
     # ``upper_right`` remains available for old V5 index semantics.
-    kx = int(round((wafer_cx - x1 - phx) / px))
-    ky_unrounded = (wafer_cy - y1 - phy) / py
-    ky = int(round(ky_unrounded) if config.origin_mode == "nearest_center"
-             else np.floor(ky_unrounded))
-    x0 = int(round(x1 + phx + kx * px))
-    y0 = int(round(y1 + phy + ky * py))
-    quality = _candidate_quality(col, px, phx) + _candidate_quality(row, py, phy)
-    return px, py, x0, y0, quality, {"gx": gx, "gy": gy, "col": col, "row": row,
+    x0, y0 = _snap_origin_to_mode(x1 + phx, y1 + phy, px, py,
+                                  wafer_cx, wafer_cy, config.origin_mode)
+    quality = _candidate_quality(col_centre, px, phx) + _candidate_quality(row_centre, py, phy)
+    width_x = int(np.clip(round(px * 0.12), 5, 15))
+    width_y = int(np.clip(round(py * 0.12), 5, 15))
+    gx_centre = cv2.boxFilter(gx, cv2.CV_32F, (width_x, 1), normalize=False)
+    gy_centre = cv2.boxFilter(gy, cv2.CV_32F, (1, width_y), normalize=False)
+    return px, py, x0, y0, quality, {"gx": gx, "gy": gy, "gx_centre": gx_centre,
+                                     "gy_centre": gy_centre, "col": col_centre, "row": row_centre,
                                      "x1": x1, "y1": y1}
 
 
@@ -191,10 +228,7 @@ def _std_grid_candidate(image_bgr: np.ndarray, wafer_cx: int, wafer_cy: int,
     px, py, x0, y0 = v5.detect_grid(
         image_bgr, wafer_cx, wafer_cy, wafer_r, method="std",
         roi_ratio=config.roi_ratio, min_pitch=config.min_pitch, max_pitch=config.max_pitch)
-    if config.origin_mode == "nearest_center":
-        # V5 returns the street immediately above centre.  Shift by an
-        # integral period to the truly closest crossing without changing grid.
-        y0 = int(round(y0 + round((wafer_cy - y0) / py) * py))
+    x0, y0 = _snap_origin_to_mode(x0, y0, px, py, wafer_cx, wafer_cy, config.origin_mode)
     gray = cv2.cvtColor(image_bgr, cv2.COLOR_BGR2GRAY).astype(np.float32)
     half = max(80, int(wafer_r * config.roi_ratio))
     x1, x2 = max(0, wafer_cx - half), min(gray.shape[1], wafer_cx + half)
@@ -230,24 +264,44 @@ def detect_grid_color_robust(image_bgr: np.ndarray, wafer_cx: int, wafer_cy: int
         raise RuntimeError("No robust grid candidate succeeded. " + "; ".join(errors))
 
     name, px, py, x0, y0, score, diag = max(candidates, key=lambda item: item[5])
+    # ``std`` is often strongest for pitch, but its low-variance profile can
+    # phase-lock to one edge of a street. When invariant gradients agree on
+    # pitch, retain the selected pitch but use their street-centre phase.
+    phase_diag = diag
+    origin_source = name
+    if name == "std":
+        for cand_name, cand_px, cand_py, cand_x0, cand_y0, _, cand_diag in candidates:
+            agrees = (abs(cand_px - px) <= max(2.0, px * 0.03)
+                      and abs(cand_py - py) <= max(2.0, py * 0.03))
+            if cand_name == "gradient" and cand_diag is not None and agrees:
+                x0, y0 = _snap_origin_to_mode(cand_x0, cand_y0, px, py,
+                                               wafer_cx, wafer_cy, config.origin_mode)
+                phase_diag = cand_diag
+                origin_source = "gradient_street_centre"
+                break
     phase_info: Dict[str, float] = {"shift_x": 0.0, "shift_y": 0.0,
                                     "confidence_x": 0.0, "confidence_y": 0.0}
-    if config.phase_refine and diag is not None:
+    if config.phase_refine and phase_diag is not None:
         # Use full-image directional edge responses for a central geometry
         # anchor; the candidate's ROI was used only for pitch estimation.
         x0, sx, cx_score = _periodic_line_alignment(
-            diag["gx"].mean(axis=0), x0, px, wafer_cx,
+            phase_diag["gx_centre"].mean(axis=0), x0, px, wafer_cx,
             config.phase_refine_search_px, config.phase_refine_max_shift_px)
         y0, sy, cy_score = _periodic_line_alignment(
-            diag["gy"].mean(axis=1), y0, py, wafer_cy,
+            phase_diag["gy_centre"].mean(axis=1), y0, py, wafer_cy,
             config.phase_refine_search_px, config.phase_refine_max_shift_px)
         phase_info = {"shift_x": sx, "shift_y": sy,
                       "confidence_x": cx_score, "confidence_y": cy_score}
+    # Phase refinement preserves the lattice but may choose a different
+    # representative period.  Always re-snap it to the requested reference.
+    x0, y0 = _snap_origin_to_mode(x0, y0, px, py, wafer_cx, wafer_cy, config.origin_mode)
     return px, py, x0, y0, {
         "selected_method": name,
         "quality": float(score),
         "phase_refinement": phase_info,
         "origin_mode": config.origin_mode,
+        "origin_source": origin_source,
+        "origin_delta_from_center_px": {"x": int(x0 - wafer_cx), "y": int(y0 - wafer_cy)},
         "candidates": [{"method": n, "pitch_x": a, "pitch_y": b, "quality": q}
                        for n, a, b, _, _, q, _ in candidates],
         "errors": errors,

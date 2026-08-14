@@ -1,0 +1,138 @@
+{
+  "01_left_top.png": {
+    "name": "left_top",
+    "size": 1600,
+    "cx": 790,
+    "cy": 810,
+    "r": 700,
+    "pitch_x": 80.0,
+    "pitch_y": 76.0,
+    "phase_x": 61.0,
+    "phase_y": 59.0,
+    "street_w": 8.0,
+    "angle_deg": 0.0,
+    "bg": [
+      4,
+      4,
+      4
+    ],
+    "die": [
+      132,
+      114,
+      94
+    ],
+    "street": [
+      244,
+      244,
+      242
+    ],
+    "street_x_mod": 51.0,
+    "street_y_mod": 33.0,
+    "nearest_corner": [
+      771,
+      793
+    ]
+  },
+  "02_right_top.png": {
+    "name": "right_top",
+    "size": 1600,
+    "cx": 790,
+    "cy": 810,
+    "r": 700,
+    "pitch_x": 80.0,
+    "pitch_y": 76.0,
+    "phase_x": 19.0,
+    "phase_y": 59.0,
+    "street_w": 8.0,
+    "angle_deg": 0.0,
+    "bg": [
+      4,
+      4,
+      4
+    ],
+    "die": [
+      132,
+      114,
+      94
+    ],
+    "street": [
+      244,
+      244,
+      242
+    ],
+    "street_x_mod": 9.0,
+    "street_y_mod": 33.0,
+    "nearest_corner": [
+      809,
+      793
+    ]
+  },
+  "03_left_bottom.png": {
+    "name": "left_bottom",
+    "size": 1600,
+    "cx": 790,
+    "cy": 810,
+    "r": 700,
+    "pitch_x": 80.0,
+    "pitch_y": 76.0,
+    "phase_x": 61.0,
+    "phase_y": 17.0,
+    "street_w": 8.0,
+    "angle_deg": 0.0,
+    "bg": [
+      4,
+      4,
+      4
+    ],
+    "die": [
+      132,
+      114,
+      94
+    ],
+    "street": [
+      244,
+      244,
+      242
+    ],
+    "street_x_mod": 51.0,
+    "street_y_mod": 67.0,
+    "nearest_corner": [
+      771,
+      827
+    ]
+  },
+  "04_right_bottom.png": {
+    "name": "right_bottom",
+    "size": 1600,
+    "cx": 790,
+    "cy": 810,
+    "r": 700,
+    "pitch_x": 80.0,
+    "pitch_y": 76.0,
+    "phase_x": 19.0,
+    "phase_y": 17.0,
+    "street_w": 8.0,
+    "angle_deg": 0.0,
+    "bg": [
+      4,
+      4,
+      4
+    ],
+    "die": [
+      132,
+      114,
+      94
+    ],
+    "street": [
+      244,
+      244,
+      242
+    ],
+    "street_x_mod": 9.0,
+    "street_y_mod": 67.0,
+    "nearest_corner": [
+      809,
+      827
+    ]
+  }
+}

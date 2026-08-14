@@ -200,6 +200,9 @@ python test_natural_color_series.py
 # 자연스러운 pearl-white + 갈색 잔류물 street 이미지
 python test_white_brown_natural_streets.py
 
+# 중심에 가장 가까운 grid 코너: 실제 wafer 6장 + 좌/우/상/하 위상 fixture 4장
+python test_nearest_center_corner.py
+
 # 모든 원본 fixture의 grid + wafer center + 최근접 기준 코너 결과 생성
 python make_all_diagnostics.py
 # 위 19개 결과의 한 장짜리 미리보기 생성
