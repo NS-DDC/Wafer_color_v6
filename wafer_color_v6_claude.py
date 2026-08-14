@@ -411,7 +411,7 @@ import os
 import sys
 import time
 import traceback
-from dataclasses import dataclass, field, fields as dataclasses_fields
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple, Union
 
@@ -811,34 +811,50 @@ class GridDiagnostics:
 
 @dataclass
 class WaferDieMapV6:
-    """build_die_map_v6() 결과 = **V5 WaferDieMap 과 같은 형식** + 부가 필드 2개.
+    """build_die_map_v6() 결과. **V5 WaferDieMap 과 같은 형식** + 부가 필드 2개.
 
-    별도 클래스인 이유는 형식이 달라서가 아니라, v6 가 v5 를 import 하지 않는
-    독립 모듈이라 dataclass 를 다시 선언할 수밖에 없기 때문이다. 내용은
-    v5 의 22개 필드를 **이름/타입/순서 그대로** 복사한 뒤 뒤에 2개만 덧붙였다.
+    이 모듈은 v5 를 import 하지 않는다. v5 의 정의를 통째로 복붙해 온 것이라
+    이름/타입/순서가 같을 뿐이고, 런타임 의존성은 전혀 없다.
+    (``wafer_die_map_v5.py`` 를 지워도 v6 는 그대로 동작한다.)
 
-    따라서 v5 의 후처리 함수를 그대로 쓸 수 있다 (실측 확인):
+    형식이 같으므로 기존에 v5 결과를 쓰던 코드는 **그대로 v6 결과를 받는다.**
+    필드 접근이든 위치 인자 언패킹이든 동일하게 동작한다.
 
-        import wafer_die_map_v5 as v5
-        m = build_die_map_v6("wafer.png")
-        v5.locate_die(m, point=(1600, 1600))   # 그대로 동작
+    앞 22개 필드 (v5 와 이름/타입/순서 동일)
+    ---------------------------------------
+    wafer_cx, wafer_cy, wafer_r   웨이퍼 중심/반지름 (px)
+    pitch_x, pitch_y              die pitch (px, sub-pixel float)
+    x0, y0                        grid origin = 중심에 가장 가까운 street 교차점
+    die_w, die_h                  die crop 크기 (= round(pitch))
+    pixel_per_unit                실측 좌표 환산 단위 (px/unit)
+    dies                          die entry 리스트
+    dies_by_index                 {(ix,iy): entry}
+    image_shape                   (H, W)
+    rotation_deg                  적용된 회전 보정 각도
+    aligned_image                 정렬 후 실제 사용 이미지 (모든 좌표의 기준)
+    notch_center_px               notch 중심 (없으면 None)
+    die_grid_angle_resid          보정 후 잔여 기울기(deg)
+    angle_verified                notch 각도와 격자 각도 일치 여부
+    quadrant_report               4분면 검증 결과
+    edge_mode                     is_edge 기준 (circle|ring|both)
+    angle_confidence              각도 신뢰도 0~1
+    angle_agree                   projection 과 FFT 합의 여부
 
-    dies / dies_by_index 안의 die entry dict 도 v5 와 키·타입이 완전히 같다
-    (index, center_px, rect_px, crop_rect_px, real_coord,
-     is_edge_partial, is_edge_ring, is_edge, image).
+    die entry(dict) 키도 v5 와 완전히 같다::
 
-    앞 22개는 v5 와 위치까지 같으므로 위치 인자 변환도 성립한다::
+        index, center_px, rect_px, crop_rect_px, real_coord,
+        is_edge_partial, is_edge_ring, is_edge, image
 
-        import dataclasses as dc
-        v5_obj = v5.WaferDieMap(*dc.astuple(m)[:22])
-
-    v6 추가 필드 (v5 에 없음, 맨 뒤라 위치 호환을 깨지 않는다)
-    ------------------------------------------------------
+    v6 전용 추가 필드 (반드시 맨 뒤 — 중간에 끼우면 위치 인자가 밀린다)
+    ----------------------------------------------------------------
     wafer_mask   : 색상 적응형으로 구한 웨이퍼 전경 마스크 (uint8 0/255).
                    v5 는 밝기 임계값으로 매번 다시 만들었지만 v6 는
                    이미 구한 것을 그대로 넘겨준다.
     diagnostics  : 자가진단 리포트 (채널별 점수/합의도/경고).
                    ``print(m.diagnostics.report())`` 로 사람이 읽는 형태 출력.
+
+    둘 다 뒤에 붙어 있을 뿐이라 무시하면 v5 결과와 구분되지 않는다.
+    die 조회는 이 모듈 안의 :func:`locate_die_v6` 를 쓰면 된다.
     """
     wafer_cx: int
     wafer_cy: int
@@ -863,8 +879,8 @@ class WaferDieMapV6:
     angle_confidence: float = 1.0
     angle_agree: bool = True
     # --- 여기까지가 V5 WaferDieMap 과 1:1 (이름/타입/순서) -------------------
-    # 아래 2개는 v6 전용. 반드시 맨 뒤에 둬라 — 중간에 끼우면 위치 인자
-    # 호환(dc.astuple(m)[:22])이 깨진다.
+    # 아래 2개는 v6 전용. 반드시 맨 뒤에 둬라 — 중간에 끼우면 뒤 필드가
+    # 한 칸씩 밀려서 위치 인자 언패킹이 조용히 어긋난다.
     wafer_mask: Optional[np.ndarray] = field(default=None, repr=False)
     diagnostics: GridDiagnostics = field(default_factory=GridDiagnostics)
 
@@ -874,21 +890,6 @@ class WaferDieMapV6:
     @property
     def num_dies(self) -> int:
         return len(self.dies)
-
-    def to_v5_kwargs(self) -> Dict[str, Any]:
-        """v5 WaferDieMap 생성자에 그대로 넣을 수 있는 dict 반환.
-
-        v6 전용 필드(wafer_mask, diagnostics)만 빼고 전부 넘긴다::
-
-            import wafer_die_map_v5 as v5
-            v5_obj = v5.WaferDieMap(**m.to_v5_kwargs())
-
-        v5 를 import 하고 싶지 않다면 이 메서드를 쓸 필요가 없다.
-        v5 함수들은 v6 객체를 직접 받아도 동작한다 (덕 타이핑).
-        """
-        drop = {"wafer_mask", "diagnostics"}
-        return {f.name: getattr(self, f.name)
-                for f in dataclasses_fields(self) if f.name not in drop}
 
 
 # =============================================================================

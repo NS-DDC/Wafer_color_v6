@@ -364,12 +364,28 @@ the grid lines.
 
 ---
 
-## Return format: same as v5
+## Return format: same as v5, but nothing is imported
 
 `build_die_map_v6()` returns `WaferDieMapV6`, which is **v5's `WaferDieMap`
-format**, not a new one. It is a separate class only because v6 does not import
-v5 — being standalone was a requirement, so the dataclass had to be redeclared.
-The contents were copied field for field:
+format** — same field names, same types, same order, same die-entry dict keys.
+
+It is a separate class because the goal was a **copy-paste port, not a
+dependency**. The dataclass was transcribed into v6 verbatim. Nothing is
+imported from v5 at runtime:
+
+```
+$ python -c "import wafer_color_v6_claude, sys; print('wafer_die_map_v5' in sys.modules)"
+False
+```
+
+Delete `wafer_die_map_v5.py` from the directory and v6 produces byte-identical
+output — verified on all 14 targets:
+
+```
+v5 file present: False
+real_casio_top_p092.png     dies=732   pitch=(92.005,92.003) origin=(1533,1539)
+natural_teal_bluegray.png   dies=1132  pitch=(37.710,27.575) origin=(622,624)
+```
 
 | | |
 |---|---|
@@ -377,25 +393,25 @@ The contents were copied field for field:
 | positional order matches v5 | **yes** (`fields(v6)[:22] == fields(v5)`) |
 | die entry dict keys | **identical**, zero difference |
 | extra in v6 | `wafer_mask`, `diagnostics` — appended at the end |
+| runtime import of v5 | **none** |
 
-So v5's downstream helpers accept a v6 object directly, no conversion:
+Because the format matches, existing code written against v5 accepts a v6
+result unchanged — attribute access and positional unpacking both work. Use
+v6's own `locate_die_v6()` for die lookup; it returns the same 16 keys v5's
+`locate_die()` did.
 
 ```python
-import wafer_die_map_v5 as v5
-from wafer_color_v6_claude import build_die_map_v6
+from wafer_color_v6_claude import build_die_map_v6, locate_die_v6
 
 m = build_die_map_v6("wafer.png")
-v5.locate_die(m, point=(1600, 1600))
-# -> same 16 keys as v5, same die_index (0, -1)
+locate_die_v6(m, point=(1600, 1600))
+# -> {'die_index': (0, 0), 'die_center_px': (...), ... }  # 16 keys
 ```
 
-If you need a real `v5.WaferDieMap` instance (for `isinstance` checks or
-pickling), either conversion works:
-
-```python
-v5_obj = v5.WaferDieMap(**m.to_v5_kwargs())      # keyword
-v5_obj = v5.WaferDieMap(*dc.astuple(m)[:22])     # positional
-```
+The only place v5 is ever loaded is the optional A/B comparison harness
+(`compare_v5=True`), behind a lazy `importlib` call wrapped in `try/except`. If
+v5 is absent the comparison is skipped with an `[info]` line and everything else
+proceeds.
 
 The two extra fields are additions, not replacements:
 
